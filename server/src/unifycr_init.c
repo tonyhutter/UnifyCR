@@ -106,7 +106,7 @@ static int find_address(hg_class_t* hg_class,
     printf("%s\n", addr_self_string);
 
     //add to address string here
-    strcat(addr_string, addr_self_string);
+    addr_string = strdup(addr_self_string);
     //addr_string.append(addr_self_string);
     return 0;
 }
@@ -130,8 +130,10 @@ static margo_instance_id setup_sm_target(ABT_pool* progress_pool)
         assert(false);
     }
 
+    char* addr_str;
+
     /* figure out what address this server is listening on */
-    if (find_address(hg_class, hg_context, SMSVR_ADDR_STR, "") == -1)
+    if (find_address(hg_class, hg_context, SMSVR_ADDR_STR, addr_str) == -1)
         assert(false);
 
         ABT_xstream handler_xstream;
@@ -388,7 +390,10 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    rc = sock_init_server(local_rank_idx);
+    //TODO: replace with unifycr_server_rpc_init??
+    margo_instance_id mid;
+    mid = unifycr_server_rpc_init();
+    //rc = sock_init_server(local_rank_idx);
     if (rc != 0) {
         LOG(LOG_ERR, "%s", ULFS_str_errno(ULFS_ERROR_SOCKET));
         exit(1);
@@ -451,6 +456,7 @@ int main(int argc, char *argv[])
             /*sock_id is 0 if it is a listening socket*/
             if (sock_id != 0) {
                 char *cmd = sock_get_cmd_buf(sock_id);
+                //TODO: remove this loop and replace with rpc calls?
                 int cmd_rc = delegator_handle_command(cmd, sock_id);
                 if (cmd_rc != ULFS_SUCCESS) {
                     LOG(LOG_ERR, "%s",
