@@ -1,4 +1,5 @@
-SUBDIRS = meta server client t
+SUBDIRS = meta server client
+#SUBDIRS = meta server client t
 
 CONFIG = ordered
 
