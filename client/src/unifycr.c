@@ -126,7 +126,7 @@ int unifycr_spillmetablock;
 int *local_rank_lst = NULL;
 int local_rank_cnt = 0;
 
-int local_del_cnt = 0;
+int local_del_cnt = 1;
 int client_sockfd;
 struct pollfd cmd_fd;
 long shm_req_size = UNIFYCR_DEF_REQ_SIZE;
@@ -2063,13 +2063,47 @@ int unifycr_unmount(void)
     return UNIFYCR_SUCCESS;
 }
 
+/* invokes the mount rpc function by calling unifycr_sync_to_del */
+static uint32_t unifycr_client_mount_rpc_invoke(unifycr_client_rpc_context_t** unifycr_rpc_context)
+{
+    hg_handle_t handle;
+    unifycr_mount_in_t in;
+    unifycr_mount_out_t out;
+    hg_return_t hret;
+
+    printf("invoking the mount rpc function in client\n");
+
+
+    //fill in input struct
+    hret = margo_create((*unifycr_rpc_context)->mid,
+                            (*unifycr_rpc_context)->svr_addr,
+                            (*unifycr_rpc_context)->unifycr_mount_rpc_id, &handle);
+    assert(hret == HG_SUCCESS);
+
+    //fill in input struct by calling unifycr_sync_to_del
+    unifycr_sync_to_del(&in);
+
+    hret = margo_forward(handle, &in);
+    assert(hret == HG_SUCCESS);
+
+    /* decode response */
+    hret = margo_get_output(handle, &out);
+    assert(hret == HG_SUCCESS);
+
+    printf("Got response ret: %d\n", out.ret);
+
+    margo_free_output(handle, &out);
+    margo_destroy(handle);
+    return out.ret;
+}
+
 /**
  * Transfer the client-side context information to the corresponding
  * delegator on the server side.
  */
-static int unifycr_sync_to_del(void)
+static int unifycr_sync_to_del(unifycr_mount_in_t* in)
 {
-    int cmd = COMM_MOUNT;
+    //int cmd = COMM_MOUNT;
     int num_procs_per_node = local_rank_cnt;
     int req_buf_sz = shm_req_size;
     int recv_buf_sz = shm_recv_size;
@@ -2087,92 +2121,23 @@ static int unifycr_sync_to_del(void)
     strcpy(external_spill_dir, external_data_dir);
 
     /*
-     * Copy the client-side information to the command
-     * buffer, then send to the delegator. The delegator
-     * will attach to the client-side shared memory and open
-     * the spill log file based on this information.
+     * Copy the client-side information to the
+     * input struct
      */
-    memcpy(cmd_buf, &cmd, sizeof(int));
-    memcpy(cmd_buf + sizeof(int), &app_id, sizeof(int));
-    memcpy(cmd_buf + 2 * sizeof(int),
-           &local_rank_idx, sizeof(int));
-    memcpy(cmd_buf + 3 * sizeof(int),
-           &dbg_rank, sizeof(int)); /*add debug info*/
-    memcpy(cmd_buf + 4 * sizeof(int), &num_procs_per_node, sizeof(int));
-    memcpy(cmd_buf + 5 * sizeof(int), &req_buf_sz, sizeof(int));
-    memcpy(cmd_buf + 6 * sizeof(int), &recv_buf_sz, sizeof(int));
-
-    memcpy(cmd_buf + 7 * sizeof(int), &superblock_sz, sizeof(long));
-    memcpy(cmd_buf + 7 * sizeof(int) + sizeof(long),
-           &meta_offset, sizeof(long));
-    memcpy(cmd_buf + 7 * sizeof(int) + 2 * sizeof(long),
-           &meta_size, sizeof(long));
-
-    memcpy(cmd_buf + 7 * sizeof(int) + 3 * sizeof(long),
-           &fmeta_offset, sizeof(long));
-    memcpy(cmd_buf + 7 * sizeof(int) + 4 * sizeof(long),
-           &fmeta_size, sizeof(long));
-
-    memcpy(cmd_buf + 7 * sizeof(int) + 5 * sizeof(long),
-           &data_offset, sizeof(long));
-    memcpy(cmd_buf + 7 * sizeof(int) + 6 * sizeof(long),
-           &data_size, sizeof(long));
-
-    memcpy(cmd_buf + 7 * sizeof(int) + 7 * sizeof(long),
-           external_spill_dir, UNIFYCR_MAX_FILENAME);
-
-    int res = __real_write(client_sockfd,
-                           cmd_buf, sizeof(cmd_buf));
-    if (res != 0) {
-        int bytes_read = 0;
-        int rc = -1;
-
-        cmd_fd.events = POLLIN | POLLPRI;
-        cmd_fd.revents = 0;
-
-        rc = poll(&cmd_fd, 1, -1);
-        if (rc == 0) {
-            /* encounter timeout*/
-            return -1;
-        } else {
-            if (rc > 0) {
-                if (cmd_fd.revents != 0) {
-                    if (cmd_fd.revents == POLLIN) {
-                        bytes_read = __real_read(client_sockfd, cmd_buf,
-                                                 sizeof(cmd_buf));
-                        if (bytes_read == 0) {
-                            /*remote connection is closed*/
-                            return -1;
-                        } else {
-                            if (*((int *)cmd_buf) != COMM_MOUNT ||
-                                *((int *)cmd_buf + 1) != ACK_SUCCESS) {
-                                /*encounter delegator-side error*/
-                                return rc;
-                            } else {
-                                unifycr_key_slice_range =
-                                    *((long *)(cmd_buf + 2 * sizeof(int)));
-                                /*success*/
-
-                            }
-                        }
-                    } else {
-                        /*encounter connection error*/
-                        return -1;
-                    }
-                } else {
-                    /*file descriptor is negative*/
-                    return -1;
-                }
-            } else {
-                /* encounter error*/
-                return -1;
-            }
-        }
-    } else {
-        /*write error*/
-        return -1;
-    }
-
+    in->app_id             = app_id;
+    in->local_rank_idx     = local_rank_idx;
+    in->dbg_rank           = dbg_rank;
+    in->num_procs_per_node = num_procs_per_node;
+    in->req_buf_sz         = req_buf_sz;
+    in->recv_buf_sz        = recv_buf_sz;
+    in->superblock_sz      = superblock_sz;
+    in->meta_offset        = meta_offset;
+    in->meta_size          = meta_size;
+    in->fmeta_offset       = fmeta_offset;
+    in->fmeta_size         = fmeta_size;
+    in->data_offset        = data_offset;
+    in->data_size          = data_size;
+    in->external_spill_dir = external_spill_dir;
     return 0;
 }
 
@@ -2251,7 +2216,7 @@ static int unifycr_init_req_shm(int local_rank_idx, int app_id)
  * same node from the first delegator
  * on the server side
  */
-static int get_del_cnt(void)
+static int get_pel_cnt(void)
 {
     int cmd = COMM_SYNC_DEL;
     int res;
@@ -2315,7 +2280,7 @@ static int unifycr_client_rpc_init(char* svr_addr_str,
                             unifycr_client_rpc_context_t** unifycr_rpc_context)
 {
 
-    assert(!*unifycr_rpc_context);
+    //assert(!*unifycr_rpc_context);
     *unifycr_rpc_context = malloc(sizeof(unifycr_client_rpc_context_t));
     assert(*unifycr_rpc_context);
 
@@ -2325,6 +2290,7 @@ static int unifycr_client_rpc_init(char* svr_addr_str,
     for(i = 0; i < 11 && svr_addr_str[i] != '\0' && svr_addr_str[i] != ':'; i++)
         proto[i] = svr_addr_str[i];
 
+#if 0
     /* initialize mercury using transport protocol */
     (*unifycr_rpc_context)->hg_class = HG_Init(proto, HG_FALSE);
     if (!(*unifycr_rpc_context)->hg_class) {
@@ -2347,17 +2313,25 @@ static int unifycr_client_rpc_init(char* svr_addr_str,
         fprintf(stderr, "Error: ABT_init()\n");
         return UNIFYCR_FAILURE;
     }
+#endif
+    /* initialize margo */
+    printf("svr_addr_str:%s\n", svr_addr_str);
+    (*unifycr_rpc_context)->mid = margo_init(proto, MARGO_CLIENT_MODE,
+                                             0, 0);
+    assert((*unifycr_rpc_context)->mid);
+    margo_diag_start((*unifycr_rpc_context)->mid);
 
+#if 0
     /* set primary ES to idle without polling */
     ret = ABT_snoozer_xstream_self_set();
     if (ret != 0) {
         fprintf(stderr, "Error: ABT_snoozer_xstream_self_set()\n");
         return UNIFYCR_FAILURE;
     }
-
+#endif
     /* retrive current pool to use for ULT creation */
     ABT_xstream xstream;
-    ret = ABT_xstream_self(&xstream);
+    int ret = ABT_xstream_self(&xstream);
     if (ret != 0) {
         fprintf(stderr, "Error: ABT_xstream_self()\n");
         return UNIFYCR_FAILURE;
@@ -2370,24 +2344,26 @@ static int unifycr_client_rpc_init(char* svr_addr_str,
         return UNIFYCR_FAILURE;
     }
 
-    /* initialize margo */
-    (*unifycr_rpc_context)->mid = margo_init(svr_addr_str, MARGO_CLIENT_MODE, 
-                                             0, 0);
-    assert((*unifycr_rpc_context)->mid);
-    margo_diag_start((*unifycr_rpc_context)->mid);
-
     /* register read rpc with mercury */
-    /*(*unifycr_rpc_context)->read_rpc_id = MERCURY_REGISTER(
-                                             (*unifycr_rpc_context)->mid,
-                                             "unifycr_mount_rpc",
-                                             unifycr_mount_in_t,
-                                             unifycr_mount_out_t,
-                                             NULL);*/
-    (*unifycr_rpc_context)->read_rpc_id = MARGO_REGISTER((*unifycr_rpc_context)->mid,
+    /*(*unifycr_rpc_context)->read_rpc_id = MARGO_REGISTER((*unifycr_rpc_context)->mid,
                                                          "unifycr_mount_rpc",
                                                          unifycr_mount_in_t,
                                                          unifycr_mount_out_t,
-                                                         unifycr_mount_rpc);
+                                                         unifycr_mount_rpc);*/
+    (*unifycr_rpc_context)->unifycr_mount_rpc_id   =
+        MARGO_REGISTER((*unifycr_rpc_context)->mid, "unifycr_mount_rpc",
+                       unifycr_mount_in_t,
+                       unifycr_mount_out_t, NULL);
+
+    (*unifycr_rpc_context)->unifycr_metaget_rpc_id =
+        MARGO_REGISTER((*unifycr_rpc_context)->mid, "unifycr_metaget_rpc",
+                       unifycr_metaget_in_t, unifycr_metaget_out_t,
+                       NULL);
+
+    (*unifycr_rpc_context)->unifycr_metaset_rpc_id =
+        MARGO_REGISTER((*unifycr_rpc_context)->mid, "unifycr_metaset_rpc",
+                       unifycr_metaget_in_t, unifycr_metaget_out_t,
+                       NULL);
 
     /* resolve server address */
     (*unifycr_rpc_context)->svr_addr = HG_ADDR_NULL;
@@ -2744,7 +2720,6 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
 
     if (ret != UNIFYCR_SUCCESS)
         return ret;
-
     if (fs_type == UNIFYCR_LOG || fs_type == UNIFYCR_STRIPE) {
         char host_name[UNIFYCR_MAX_FILENAME] = {0};
         int rc = gethostname(host_name, UNIFYCR_MAX_FILENAME);
@@ -2753,78 +2728,28 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
             DEBUG("rank:%d, fail to get the host name.", dbg_rank);
             return UNIFYCR_FAILURE;
         }
-
-        /* get the number of collocated delegators*/
-        if (local_rank_idx == 0) {
-            rc = unifycr_init_socket(0, 1, 1);
-            if (rc < 0)
-                return -1;
-
-            local_del_cnt = get_del_cnt();
-            if (local_del_cnt > 0) {
-                int i;
-
-                for (i = 0; i < local_rank_cnt; i++) {
-                    if (local_rank_lst[i] != rank) {
-                        int rc = MPI_Send(&local_del_cnt, 1, MPI_INT,
-                                          local_rank_lst[i], 0,
-                                          MPI_COMM_WORLD);
-                        if (rc != MPI_SUCCESS) {
-                            DEBUG("rank:%d, MPI_Send failed", dbg_rank);
-                            return UNIFYCR_FAILURE;
-                        }
-
-                    }
-                }
-            } else {
-                DEBUG("rank:%d, fail to get the delegator count.", dbg_rank);
-                return UNIFYCR_FAILURE;
-            }
-
-        } else {
-            MPI_Status status;
-            int rc = MPI_Recv(&local_del_cnt, 1, MPI_INT, local_rank_lst[0],
-                              0, MPI_COMM_WORLD, &status);
-
-            if (rc != MPI_SUCCESS) {
-                DEBUG("rank:%d, MPI_Recv failed.", dbg_rank);
-                return UNIFYCR_FAILURE;
-            }
-            if (local_del_cnt < 0 || rc < 0) {
-                DEBUG("rank:%d, fail to initialize socket.", dbg_rank);
-                return UNIFYCR_FAILURE;
-            } else  {
-                int rc = unifycr_init_socket(local_rank_idx,
-                                             local_rank_cnt, local_del_cnt);
-                if (rc < 0) {
-                    DEBUG("rank:%d, fail to initialize socket.", dbg_rank);
-                    return UNIFYCR_FAILURE;
-                }
-            }
-        }
-
-        /*connect to server-side delegators*/
-
-        rc = unifycr_init_req_shm(local_rank_idx, app_id);
-        if (rc < 0) {
-            DEBUG("rank:%d, fail to init shared request memory.", dbg_rank);
-            return UNIFYCR_FAILURE;
-        }
-
-        rc = unifycr_init_recv_shm(local_rank_idx, app_id);
-        if (rc < 0) {
-            DEBUG("rank:%d, fail to init shared receive memory.", dbg_rank);
-            return UNIFYCR_FAILURE;
-        }
-
-        rc = unifycr_sync_to_del();
-        if (rc < 0) {
-            DEBUG("rank:%d, fail to convey information to the delegator.",
-                  dbg_rank);
-            return UNIFYCR_FAILURE;
-        }
-
     }
+
+    FILE *fp;
+    char addr_string[50];
+    fp = fopen("/dev/shm/svr_id","r");
+    fscanf(fp, "%s", addr_string);
+    fclose(fp);
+
+    unifycr_client_rpc_context_t* unifycr_rpc_context = NULL;
+    unifycr_client_rpc_init(addr_string, &unifycr_rpc_context);
+
+    //TODO: call client rpc function here (which calls unifycr_sync_to_del
+    unifycr_client_mount_rpc_invoke(&unifycr_rpc_context);
+
+    int rc = unifycr_init_socket(local_rank_idx, local_rank_cnt,
+                                local_del_cnt);
+    if (rc < 0) {
+        DEBUG("rank:%d, fail to initialize socket.", dbg_rank);
+        return UNIFYCR_FAILURE;
+    }
+
+    //TODO: //not sure if i need all of this..
     /* add mount point as a new directory in the file list */
     if (unifycr_get_fid_from_path(prefix) >= 0) {
         /* we can't mount this location, because it already exists */

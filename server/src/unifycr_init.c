@@ -106,7 +106,15 @@ static int find_address(hg_class_t* hg_class,
     printf("%s\n", addr_self_string);
 
     //add to address string here
-    strcat(addr_string, addr_self_string);
+    addr_string = strcpy(addr_string, addr_self_string);
+
+    /* write server address to /dev/shm/ for client on node to
+     * read from */
+    FILE *fp;
+    fp = fopen("/dev/shm/svr_id", "w+");
+    fprintf(fp, addr_string);
+    fclose(fp);
+    printf("addr string:%s\n", addr_string);
     //addr_string.append(addr_self_string);
     return 0;
 }
@@ -116,8 +124,9 @@ static int find_address(hg_class_t* hg_class,
  *                   Not used for FUSE deployment.
  *
  */
-static margo_instance_id setup_sm_target(ABT_pool* progress_pool)
+static margo_instance_id setup_sm_target()
 {
+    /*
     hg_class_t* hg_class = HG_Init(SMSVR_ADDR_STR, HG_TRUE);
     if ( !hg_class ) {
         fprintf(stderr, "Error: HG_Init() for sm_target\n");
@@ -128,35 +137,77 @@ static margo_instance_id setup_sm_target(ABT_pool* progress_pool)
         fprintf(stderr, "Error: HG_Context_create() for sm_target\n");
         HG_Finalize(hg_class);
         assert(false);
-    }
+    }*/
+
+    //char addr_str[128];
 
     /* figure out what address this server is listening on */
-    if (find_address(hg_class, hg_context, SMSVR_ADDR_STR, "") == -1)
-        assert(false);
+    /*if (find_address(hg_class, hg_context, SMSVR_ADDR_STR, addr_str) == -1)
+        assert(false);*/
 
-        ABT_xstream handler_xstream;
+        /*ABT_xstream handler_xstream;
         ABT_pool handler_pool;
         int ret = ABT_snoozer_xstream_create(1, &handler_pool,
                                              &handler_xstream);
         if ( ret != 0 ) {
                 fprintf(stderr, "Error: ABT_snoozer_xstream_create()\n");
                 assert(false);
+        }*/
+        /* initialize margo */
+    hg_return_t hret;
+    margo_instance_id mid;
+    hg_addr_t addr_self;
+    char addr_self_string[128];
+    hg_size_t addr_self_string_sz = 128;
+    mid = margo_init(SMSVR_ADDR_STR, MARGO_SERVER_MODE,
+                                            0, 0);
+    assert(mid);
+    printf("mid: %d\n", mid);
+    margo_diag_start(mid);
+
+    /* figure out what address this server is listening on */
+    hret = margo_addr_self(mid, &addr_self);
+    if(hret != HG_SUCCESS)
+    {
+        fprintf(stderr, "Error: margo_addr_self()\n");
+        margo_finalize(mid);
+        return(-1);
         }
+    hret = margo_addr_to_string(mid, addr_self_string,
+                               &addr_self_string_sz, addr_self);
+    if(hret != HG_SUCCESS)
+    {
+        printf(stderr, "Error: margo_addr_to_string()\n");
+        margo_addr_free(mid, addr_self);
+        margo_finalize(mid);
+        return(-1);
+     }
+    margo_addr_free(mid, addr_self);
 
-        margo_instance_id mid = margo_init_pool(*progress_pool, handler_pool,
-                                            hg_context);
-        assert(mid);
+    printf("# accepting RPCs on address \"%s\"\n", addr_self_string);
 
-        MARGO_REGISTER(mid, "unifycr_mount_rpc",
-                         unifycr_mount_in_t, unifycr_mount_out_t,
-                         unifycr_mount_rpc);
-        MARGO_REGISTER(mid, "unifycr_metaget_rpc",
-                         unifycr_metaget_in_t, unifycr_metaget_out_t,
-                         unifycr_metaget_rpc);
+    /* write server address to /dev/shm/ for client on node to
+     * read from */
+    FILE *fp;
+    fp = fopen("/dev/shm/svr_id", "w+");
+    fprintf(fp, addr_self_string);
+    fclose(fp);
 
-        MARGO_REGISTER(mid, "unifycr_metaset_rpc",
-                         unifycr_metaget_in_t, unifycr_metaget_out_t,
-                         unifycr_metaget_rpc);
+        //margo_instance_id mid = margo_init_pool(*progress_pool, handler_pool,
+        //                                    hg_context);
+        //assert(mid);
+
+    MARGO_REGISTER(mid, "unifycr_mount_rpc",
+                     unifycr_mount_in_t, unifycr_mount_out_t,
+                     unifycr_mount_rpc);
+
+    MARGO_REGISTER(mid, "unifycr_metaget_rpc",
+                     unifycr_metaget_in_t, unifycr_metaget_out_t,
+                     unifycr_metaget_rpc);
+
+    MARGO_REGISTER(mid, "unifycr_metaset_rpc",
+                     unifycr_metaget_in_t, unifycr_metaget_out_t,
+                     unifycr_metaget_rpc);
 
 /*        MARGO_REGISTER(mid, "unifycr_write_rpc",
                          unifycr_write_in_t, unifycr_write_out_t,
@@ -278,19 +329,20 @@ margo_instance_id unifycr_server_rpc_init()
 {
     //assert(unifycr_rpc_context);
     /* set up argobots */
-    int ret = ABT_init(0, NULL);
+    /*int ret = ABT_init(0, NULL);
     if ( ret != 0 ) {
         fprintf(stderr, "Error: ABT_init()\n");
         assert(false);
-    }
+    }*/
 
     /* set primary ES to idle without polling */
+    /*
     ret = ABT_snoozer_xstream_self_set();
     if ( ret != 0 ) {
         fprintf(stderr, "Error: ABT_snoozer_xstream_self_set()\n");
         assert(false);
     }
-/*
+
 
     ABT_xstream* io_xstreams = (ABT_xstream*)malloc(sizeof(ABT_xstream) * IO_POOL_SIZE);
     assert(io_xstreams);
@@ -316,15 +368,15 @@ margo_instance_id unifycr_server_rpc_init()
         fprintf(stderr, "Error: ABT_xstream_get_main_pools()\n");
         assert(false);
     }
-*/
+
     ABT_xstream progress_xstream;
     ABT_pool progress_pool;
     ret = ABT_snoozer_xstream_create(1, &progress_pool, &progress_xstream);
     if ( ret != 0 ) {
         fprintf(stderr, "Error: ABT_snoozer_xstream_create()\n");
         assert(false);
-    }
-    return setup_sm_target(&progress_pool);
+    }*/
+    return setup_sm_target();
 #ifdef VERBS_TARGET
     ABT_xstream progress_xstream2;
     ABT_pool progress_pool2;
@@ -387,7 +439,10 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    rc = sock_init_server(local_rank_idx);
+    //TODO: replace with unifycr_server_rpc_init??
+    margo_instance_id mid;
+    mid = unifycr_server_rpc_init();
+    //rc = sock_init_server(local_rank_idx);
     if (rc != 0) {
         LOG(LOG_ERR, "%s", ULFS_str_errno(ULFS_ERROR_SOCKET));
         exit(1);
@@ -403,7 +458,7 @@ int main(int argc, char *argv[])
     /*wait for the service manager to connect to the
      *request manager so that they can exchange control
      *information*/
-    rc = sock_wait_cli_cmd();
+    /*rc = sock_wait_cli_cmd();
     if (rc != ULFS_SUCCESS) {
         int ret = sock_handle_error(rc);
         if (ret != 0) {
@@ -416,7 +471,7 @@ int main(int argc, char *argv[])
         if (sock_id != 0) {
             exit(1);
         }
-    }
+    }*/
 
     rc = meta_init_store();
     if (rc != 0) {
@@ -425,6 +480,9 @@ int main(int argc, char *argv[])
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
+
+    margo_wait_for_finalize(mid);
+#if 0
     while (1) {
         rc = sock_wait_cli_cmd();
         if (rc != ULFS_SUCCESS) {
@@ -450,6 +508,7 @@ int main(int argc, char *argv[])
             /*sock_id is 0 if it is a listening socket*/
             if (sock_id != 0) {
                 char *cmd = sock_get_cmd_buf(sock_id);
+                //TODO: remove this loop and replace with rpc calls?
                 int cmd_rc = delegator_handle_command(cmd, sock_id);
                 if (cmd_rc != ULFS_SUCCESS) {
                     LOG(LOG_ERR, "%s",
@@ -460,7 +519,7 @@ int main(int argc, char *argv[])
         }
 
     }
-
+#endif
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
     return 0;
