@@ -63,7 +63,7 @@
 #include <pthread.h>
 #include "unifycr-sysio.h"
 #include "unifycr-internal.h"
-
+#include "unifycr_client.h"
 /* -------------------
  * define external variables
  * --------------------*/
@@ -1516,6 +1516,26 @@ int UNIFYCR_WRAP(ftruncate)(int fd, off_t length)
     }
 }
 
+/* get the gfid for use in fsync wrapper
+ * TODO: maybe move this somewhere else */
+uint32_t get_gfid(int fd)
+{
+    uint32_t gfid;
+    unifycr_fattr_t tmp_meta_entry;
+    tmp_meta_entry.fid = fd;
+    unifycr_fattr_t *ptr_meta_entry = (unifycr_fattr_t *)bsearch(&tmp_meta_entry,
+                                                                 unifycr_fattrs.meta_entry,
+                                                                 *unifycr_fattrs.ptr_num_entries,
+                                                                 sizeof(unifycr_fattr_t),
+                                                                 compare_fattr);
+    if (ptr_meta_entry != NULL) {
+        gfid = (uint32_t)ptr_meta_entry->gfid;
+    } else {
+        return -1;
+    }
+    return gfid;
+}
+
 int UNIFYCR_WRAP(fsync)(int fd)
 {
     /* check whether we should intercept this file descriptor */
@@ -1535,60 +1555,17 @@ int UNIFYCR_WRAP(fsync)(int fd)
         }
 
         if (fs_type == UNIFYCR_LOG) {
-            /*put indices to key-value store*/
-            int cmd = COMM_META;
-            memcpy(cmd_buf, &cmd, sizeof(int));
-            int flag = 3;
-            memcpy(cmd_buf + sizeof(int), &flag, sizeof(int));
-            int res = __real_write(client_sockfd, cmd_buf, sizeof(cmd_buf));
+            /* get gfid */
+            uint32_t gfid;
+            gfid = get_gfid(fd);
 
-            if (res != 0) {
-                int rc;
-                cmd_fd.events = POLLIN | POLLPRI;
-                cmd_fd.revents = 0;
-
-                rc = poll(&cmd_fd, 1, -1);
-                if (rc == 0) {
-                    /*time out event*/
-                } else if (rc > 0) {
-                    if (cmd_fd.revents != 0) {
-                        if (cmd_fd.revents == POLLIN) {
-                            int bytes_read = 0;
-                            bytes_read = __real_read(client_sockfd,
-                                                     cmd_buf, sizeof(cmd_buf));
-                            if (bytes_read == 0) {
-                                return -1;
-                            } else {
-                                /**/
-                                if (ack_msg[0] != COMM_META ||
-                                    ack_msg[1] != ACK_SUCCESS) {
-                                    return -1;
-                                } else {
-
-                                }
-                            }
-                        } else {
-                            return -1;
-                        }
-                    }
-
-                } else {
-                    return -1;
-                }
-            }
-            /* TODO: if using spill over we may have some fsyncing to do */
-
-            /* nothing to do in our case */
-            return 0;
-        } else {
-            MAP_OR_FAIL(fsync);
-            int ret = UNIFYCR_REAL(fsync)(fd);
-            return ret;
+            /* invoke fsync rpc here */
+            unifycr_client_fsync_rpc_invoke(&unifycr_rpc_context,
+                                            app_id,
+                                            local_rank_idx,
+                                            gfid);
         }
     }
-
-
-
 
     /* check whether we should intercept this file descriptor */
     if (unifycr_intercept_fd(&fd)) {
