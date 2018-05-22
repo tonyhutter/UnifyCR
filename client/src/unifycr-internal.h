@@ -555,4 +555,5 @@ int unifycr_match_received_ack(read_req_t *read_req, int count,
                                read_req_t *match_req);
 int unifycr_locate_req(read_req_t *read_req, int count,
                        read_req_t *match_req);
+
 #endif /* UNIFYCR_INTERNAL_H */
