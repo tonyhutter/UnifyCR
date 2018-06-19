@@ -206,21 +206,13 @@ static margo_instance_id setup_sm_target()
                      unifycr_metaget_rpc);
 
     MARGO_REGISTER(mid, "unifycr_metaset_rpc",
-                     unifycr_metaget_in_t, unifycr_metaget_out_t,
-                     unifycr_metaget_rpc);
+                     unifycr_metaset_in_t, unifycr_metaset_out_t,
+                     unifycr_metaset_rpc);
 
-/*        MARGO_REGISTER(mid, "unifycr_write_rpc",
-                         unifycr_write_in_t, unifycr_write_out_t,
-                         unifycr_write_rpc);
+    MARGO_REGISTER(mid, "unifycr_fsync_rpc",
+                     unifycr_fsync_in_t, unifycr_fsync_out_t,
+                     unifycr_fsync_rpc);
 
-        MARGO_REGISTER(mid, "unifycr_addfile_rpc",
-                         unifycr_addfile_in_t, unifycr_addfile_out_t,
-                         unifycr_addfile_rpc);
-
-        MARGO_REGISTER(mid, "unifycr_open_rpc",
-                         unifycr_open_in_t, unifycr_open_out_t,
-                         unifycr_open_rpc);
-*/
     return mid;
 }
 
@@ -423,6 +415,7 @@ int main(int argc, char *argv[])
     else
         sprintf(dbg_fname, "%s-%d.log", DBG_FNAME, glb_rank);
 
+	printf("Debug file: %s\n", DBG_FNAME);
     rc = dbg_open(dbg_fname);
     if (rc != ULFS_SUCCESS)
         LOG(LOG_ERR, "%s", ULFS_str_errno(rc));
@@ -442,7 +435,7 @@ int main(int argc, char *argv[])
     //TODO: replace with unifycr_server_rpc_init??
     margo_instance_id mid;
     mid = unifycr_server_rpc_init();
-    //rc = sock_init_server(local_rank_idx);
+    rc = sock_init_server(local_rank_idx);
     if (rc != 0) {
         LOG(LOG_ERR, "%s", ULFS_str_errno(ULFS_ERROR_SOCKET));
         exit(1);

@@ -39,7 +39,7 @@
 #include "unifycr_const.h"
 #include "unifycr_global.h"
 #include "../../client/src/unifycr_clientcalls_rpc.h"
-#define DEF_META_PATH "/l/ssd/"
+#define DEF_META_PATH "ssd/"
 #define MANIFEST_FILE_NAME "mdhim_manifest_"
 #define DEF_DB_NAME "unifycr_db"
 #define DEF_SERVER_RATIO 1
