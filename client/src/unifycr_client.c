@@ -10,19 +10,29 @@
 #include "unifycr_client.h"
 #include "unifycr_clientcalls_rpc.h"
 
+<<<<<<< HEAD
 // should be in header file
 int unifycr_sync_to_del(unifycr_mount_in_t* in);
 
+=======
+>>>>>>> b697e9ccd337d1ed830613bdd388629266b602ab
 /*
  * send global file metadata to the delegator,
  * which puts it to the key-value store
  * @param gfid: global file id
  * @return: error code
+<<<<<<< HEAD
  */
 static int set_global_file_meta(unifycr_metaset_in_t* in,
                                 unifycr_fattr_t* f_meta)
 {
     in->fid      = f_meta->fid;
+=======
+ * */
+int set_global_file_meta(unifycr_metaset_in_t* in,
+                                unifycr_fattr_t* f_meta)
+{
+>>>>>>> b697e9ccd337d1ed830613bdd388629266b602ab
     in->gfid      = f_meta->gfid;
     in->filename = f_meta->filename;
 
@@ -30,6 +40,7 @@ static int set_global_file_meta(unifycr_metaset_in_t* in,
 }
 
 /*
+<<<<<<< HEAD
  *  get global file metadata from the delegator,
  *  which retrieves the data from key-value store
  *  @param gfid: global file id
@@ -38,6 +49,16 @@ static int set_global_file_meta(unifycr_metaset_in_t* in,
  *  the retrieved metadata
  */
 static int get_global_file_meta(unifycr_metaget_in_t* in, unifycr_fattr_t **file_meta)
+=======
+ * get global file metadata from the delegator,
+ * which retrieves the data from key-value store
+ * @param gfid: global file id
+ * @return: error code
+ * @return: file_meta that point to the structure of
+ * the retrieved metadata
+ * */
+int get_global_file_meta(unifycr_metaget_in_t* in, unifycr_fattr_t **file_meta)
+>>>>>>> b697e9ccd337d1ed830613bdd388629266b602ab
 {
     *file_meta = (unifycr_fattr_t *)malloc(sizeof(unifycr_fattr_t));
     in->gfid     = (*file_meta)->gfid;
@@ -189,4 +210,47 @@ uint32_t unifycr_client_fsync_rpc_invoke(unifycr_client_rpc_context_t**
     margo_destroy(handle);
     return out.ret;
 }
+
+/* invokes the client read rpc function */
+uint32_t unifycr_client_read_rpc_invoke(unifycr_client_rpc_context_t**
+                                                unifycr_rpc_context,
+                                                uint32_t app_id,
+                                                uint32_t local_rank_idx,
+                                                uint32_t gfid,
+                                                uint32_t read_count)
+{
+    hg_handle_t handle;
+    unifycr_read_in_t in;
+    unifycr_read_out_t out;
+    hg_return_t hret;
+
+    printf("invoking the read rpc function in client\n");
+
+    /* fill in input struct */
+    hret = margo_create((*unifycr_rpc_context)->mid,
+                            (*unifycr_rpc_context)->svr_addr,
+                            (*unifycr_rpc_context)->unifycr_read_rpc_id,
+                            &handle);
+    assert(hret == HG_SUCCESS);
+
+    /* fill in input struct */
+    in.app_id         = app_id;
+    in.local_rank_idx = local_rank_idx;
+    in.gfid           = gfid;
+    in.read_count     = read_count;
+
+    hret = margo_forward(handle, &in);
+    assert(hret == HG_SUCCESS);
+
+    /* decode response */
+    hret = margo_get_output(handle, &out);
+    assert(hret == HG_SUCCESS);
+
+    printf("Got response ret: %d\n", out.ret);
+
+    margo_free_output(handle, &out);
+    margo_destroy(handle);
+    return out.ret;
+}
+
 
