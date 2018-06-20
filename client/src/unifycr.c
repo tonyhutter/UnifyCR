@@ -1012,7 +1012,7 @@ int unifycr_fid_open(const char *path, int flags, mode_t mode, int *outfid,
 
             unifycr_fattr_t *ptr_meta = NULL;
             rc = unifycr_client_metaget_rpc_invoke(&unifycr_rpc_context,
-                                                   &ptr_meta, gfid);
+                                                   &ptr_meta, fid, gfid);
 
             if (ptr_meta == NULL) {
                 fid = -1;
