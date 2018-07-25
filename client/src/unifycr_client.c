@@ -1,3 +1,4 @@
+
 /*******************************************************************************************
  * unifycr_client.c - Implements the RPC handlers for the
  * application-client, shared-memory interface.
@@ -10,33 +11,27 @@
 #include "unifycr_client.h"
 #include "unifycr_clientcalls_rpc.h"
 
-/*
- * send global file metadata to the delegator,
- * which puts it to the key-value store
- * @param gfid: global file id
- * @return: error code
- * */
-int set_global_file_meta(unifycr_metaset_in_t* in,
+/* declaration should be moved to header file */
+int unifycr_sync_to_del(unifycr_mount_in_t* in);
+
+static int set_global_file_meta(unifycr_metaset_in_t* in,
                                 unifycr_fattr_t* f_meta)
 {
+    in->fid      = f_meta->fid;
     in->gfid      = f_meta->gfid;
     in->filename = f_meta->filename;
 
     return UNIFYCR_SUCCESS;
 }
 
-/*
- * get global file metadata from the delegator,
- * which retrieves the data from key-value store
- * @param gfid: global file id
- * @return: error code
- * @return: file_meta that point to the structure of
- * the retrieved metadata
- * */
-int get_global_file_meta(unifycr_metaget_in_t* in, unifycr_fattr_t **file_meta)
+static int get_global_file_meta(int fid, int gfid, unifycr_metaget_out_t* out , unifycr_fattr_t **file_meta)
 {
-    *file_meta = (unifycr_fattr_t *)malloc(sizeof(unifycr_fattr_t));
-    in->gfid     = (*file_meta)->gfid;
+    *file_meta = (unifycr_fattr_t *)calloc(1, sizeof(unifycr_fattr_t));
+    (*file_meta)->fid = fid;
+    (*file_meta)->gfid = gfid;
+	strcpy( (*file_meta)->filename, out->filename);
+	(*file_meta)->file_attr.st_size = out->st_size;
+	
     return UNIFYCR_SUCCESS;
 }
 
@@ -58,7 +53,6 @@ uint32_t unifycr_client_mount_rpc_invoke(unifycr_client_rpc_context_t** unifycr_
 
     /* fill in input struct by calling unifycr_sync_to_del */
     unifycr_sync_to_del(&in);
-
     hret = margo_forward(handle, &in);
     assert(hret == HG_SUCCESS);
 
@@ -66,7 +60,7 @@ uint32_t unifycr_client_mount_rpc_invoke(unifycr_client_rpc_context_t** unifycr_
     hret = margo_get_output(handle, &out);
     assert(hret == HG_SUCCESS);
 
-    printf("Got response ret: %d\n", out.ret);
+	unifycr_key_slice_range = out.max_recs_per_slice;
 
     margo_free_output(handle, &out);
     margo_destroy(handle);
@@ -112,7 +106,7 @@ uint32_t unifycr_client_metaset_rpc_invoke(unifycr_client_rpc_context_t**
 /* invokes the client metaget rpc function by calling get_global_file_meta */
 uint32_t unifycr_client_metaget_rpc_invoke(unifycr_client_rpc_context_t**
                                                 unifycr_rpc_context,
-                                                unifycr_fattr_t** file_meta)
+                                                unifycr_fattr_t** file_meta, int fid, int gfid)
 {
     hg_handle_t handle;
     unifycr_metaget_in_t in;
@@ -128,9 +122,7 @@ uint32_t unifycr_client_metaget_rpc_invoke(unifycr_client_rpc_context_t**
                             &handle);
     assert(hret == HG_SUCCESS);
 
-    /* fill in input struct by calling unifycr_sync_to_del */
-    get_global_file_meta(&in, file_meta);
-
+	in.gfid = gfid;
     hret = margo_forward(handle, &in);
     assert(hret == HG_SUCCESS);
 
@@ -138,7 +130,10 @@ uint32_t unifycr_client_metaget_rpc_invoke(unifycr_client_rpc_context_t**
     hret = margo_get_output(handle, &out);
     assert(hret == HG_SUCCESS);
 
-    printf("Got response ret: %d\n", out.ret);
+    printf("Got metaget  response ret: %d\n", out.ret);
+	if (out.ret == ACK_SUCCESS)
+    	/* fill in results  */
+    	get_global_file_meta(fid, gfid, &out, file_meta);
 
     margo_free_output(handle, &out);
     margo_destroy(handle);
@@ -226,5 +221,4 @@ uint32_t unifycr_client_read_rpc_invoke(unifycr_client_rpc_context_t**
     margo_destroy(handle);
     return out.ret;
 }
-
 

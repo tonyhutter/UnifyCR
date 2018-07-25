@@ -28,9 +28,11 @@
 /* global rpc context (probably should find a better spot for this) */
 extern unifycr_client_rpc_context_t* unifycr_rpc_context;
 
+/*
 int unifycr_client_rpc_init(char* svr_addr_str,
                              unifycr_client_rpc_context_t**
                              unifycr_rpc_context);
+*/
 
 uint32_t unifycr_client_mount_rpc_invoke(unifycr_client_rpc_context_t**
                                                 unifycr_rpc_context);
@@ -41,11 +43,19 @@ uint32_t unifycr_client_metaset_rpc_invoke(unifycr_client_rpc_context_t**
 
 uint32_t unifycr_client_metaget_rpc_invoke(unifycr_client_rpc_context_t**
                                                   unifycr_rpc_context,
-                                                  unifycr_fattr_t** file_meta);
+                                                  unifycr_fattr_t** file_meta, int fid, int gfid);
 
 uint32_t unifycr_client_fsync_rpc_invoke(unifycr_client_rpc_context_t**
                                                   unifycr_rpc_context,
                                                   uint32_t app_id,
                                                   uint32_t local_rank_idx,
                                                   uint32_t gfid);
+
+uint32_t unifycr_client_read_rpc_invoke(unifycr_client_rpc_context_t**
+                                                unifycr_rpc_context,
+                                                uint32_t app_id,
+                                                uint32_t local_rank_idx,
+                                                uint32_t gfid,
+                                                uint32_t read_count);
+
 #endif

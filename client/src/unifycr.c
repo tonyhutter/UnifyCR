@@ -1012,7 +1012,7 @@ int unifycr_fid_open(const char *path, int flags, mode_t mode, int *outfid,
 
             unifycr_fattr_t *ptr_meta = NULL;
             rc = unifycr_client_metaget_rpc_invoke(&unifycr_rpc_context,
-                                                   &ptr_meta);
+                                                   &ptr_meta, fid, gfid);
 
             if (ptr_meta == NULL) {
                 fid = -1;
@@ -1085,8 +1085,8 @@ int unifycr_fid_open(const char *path, int flags, mode_t mode, int *outfid,
 
                 ins_file_meta(&unifycr_fattrs,
                               new_fmeta);
+				printf("meta inserted\n");
                 free(new_fmeta);
-
             }
         } else {
             /* ERROR: trying to open a file that does not exist without O_CREATE */
@@ -1800,10 +1800,11 @@ static int unifycr_init(int rank)
 
         env = getenv("UNIFYCR_EXTERNAL_DATA_DIR");
         if (env) {
+			//printf("setting external_data_dir to [%s]\n", env);
             strcpy(external_data_dir, env);
         } else {
             DEBUG("UNIFYCR_EXTERNAL_DATA_DIR not set to an existing writable"
-                  " path (i.e UNIFYCR_EXTERNAL_DATA_DIR=/mnt/ssd):\n");
+                  " path (i.e UNIFYCR_EXTERNAL_DATA_DIR=/ccs/home/ogm/ssd):\n");
             return UNIFYCR_FAILURE;
         }
 
@@ -1827,7 +1828,7 @@ static int unifycr_init(int rank)
             strcpy(external_meta_dir, env);
         } else {
             DEBUG("UNIFYCR_EXTERNAL_META_DIR not set to an existing writable"
-                  " path (i.e UNIFYCR_EXTERNAL_META_DIR=/mnt/ssd):\n");
+                  " path (i.e UNIFYCR_EXTERNAL_META_DIR=/ccs/home/ogm/ssd):\n");
             return UNIFYCR_FAILURE;
         }
 
@@ -1838,7 +1839,7 @@ static int unifycr_init(int rank)
             unifycr_spillmetablock =
                 unifycr_get_spillblock(unifycr_index_buf_size, spillfile_prefix);
             if (unifycr_spillmetablock < 0) {
-                DEBUG("unifycr_get_spillmetablock failed!\n");
+               DEBUG("unifycr_get_spillmetablock failed!\n");
                 return UNIFYCR_FAILURE;
             }
         }
@@ -1866,6 +1867,7 @@ static int unifycr_init(int rank)
 int unifycr_mount(const char prefix[], int rank, size_t size,
                   int l_app_id, int subtype)
 {
+	//printf("in outer mount\n");
     switch (subtype) {
     case UNIFYCRFS:
         fs_type = UNIFYCRFS;
@@ -1947,9 +1949,10 @@ int unifycr_sync_to_del(unifycr_mount_in_t* in)
     long fmeta_size = unifycr_max_fattr_entries * sizeof(unifycr_fattr_t);
     long data_offset = (void *)unifycr_chunks - unifycr_superblock;
     long data_size = (long)unifycr_max_chunks * unifycr_chunk_size;
-    char external_spill_dir[UNIFYCR_MAX_FILENAME] = {0};
-
+    char* external_spill_dir = malloc(UNIFYCR_MAX_FILENAME);
+	//printf("external_data_dir in sync_to_del: [%s]\n", external_data_dir);
     strcpy(external_spill_dir, external_data_dir);
+	//printf("external_spill_dir in sync_to_del: [%s]\n", external_spill_dir);
 
     /*
      * Copy the client-side information to the
@@ -2159,7 +2162,6 @@ static int unifycr_client_rpc_init(char* svr_addr_str,
         fprintf(stderr, "Error: ABT_snoozer_xstream_self_set()\n");
         return UNIFYCR_FAILURE;
     }
-#endif
     /* retrive current pool to use for ULT creation */
     ABT_xstream xstream;
     int ret = ABT_xstream_self(&xstream);
@@ -2175,6 +2177,7 @@ static int unifycr_client_rpc_init(char* svr_addr_str,
         return UNIFYCR_FAILURE;
     }
 
+#endif
     /* register read rpc with mercury */
     (*unifycr_rpc_context)->unifycr_read_rpc_id =
         MARGO_REGISTER((*unifycr_rpc_context)->mid, "unifycr_read_rpc",
@@ -2202,9 +2205,15 @@ static int unifycr_client_rpc_init(char* svr_addr_str,
                        unifycr_fsync_in_t, unifycr_fsync_out_t,
                        NULL);
 
+	(*unifycr_rpc_context)->unifycr_read_rpc_id =
+        MARGO_REGISTER((*unifycr_rpc_context)->mid, "unifycr_read_rpc",
+                       unifycr_read_in_t,
+                       unifycr_read_out_t,
+                       NULL);
+
     /* resolve server address */
     (*unifycr_rpc_context)->svr_addr = HG_ADDR_NULL;
-    ret = margo_addr_lookup((*unifycr_rpc_context)->mid, svr_addr_str,
+    int ret = margo_addr_lookup((*unifycr_rpc_context)->mid, svr_addr_str,
                             &((*unifycr_rpc_context)->svr_addr));
 
     return UNIFYCR_SUCCESS;
@@ -2235,8 +2244,10 @@ static int unifycr_init_socket(int proc_id, int l_num_procs_per_node,
     int rc = -1;
 
     client_sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (client_sockfd < 0)
+    if (client_sockfd < 0) {
+		printf("socket create failed\n");
         return -1;
+	}
 
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sun_family = AF_UNIX;
@@ -2255,6 +2266,7 @@ static int unifycr_init_socket(int proc_id, int l_num_procs_per_node,
     /* exit with error if connection is not successful */
     if (result == -1) {
         rc = -1;
+		printf("socket connect failed\n");
         return rc;
     }
 
@@ -2512,6 +2524,7 @@ static int CountTasksPerNode(int rank, int numTasks)
 int unifycrfs_mount(const char prefix[], size_t size, int rank)
 {
     char *env = getenv("UNIFYCR_USE_SINGLE_SHM");
+	printf("In mount!!\n");
 
     unifycr_mount_prefix = strdup(prefix);
     unifycr_mount_prefixlen = strlen(unifycr_mount_prefix);
@@ -2521,7 +2534,8 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
 
         if (val != 0)
             unifycr_use_single_shm = 1;
-    }
+    } else
+         unifycr_use_single_shm = 1;
 
     if (unifycr_use_single_shm)
         unifycr_mount_shmget_key = UNIFYCR_SUPERBLOCK_KEY + rank;
@@ -2532,7 +2546,7 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
         int rc = CountTasksPerNode(rank, size);
 
         if (rc < 0) {
-            DEBUG("rank:%d, cannot get the local rank list.", dbg_rank);
+            printf("rank:%d, cannot get the local rank list.", dbg_rank);
             return -1;
         }
 
@@ -2562,7 +2576,7 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
         int rc = gethostname(host_name, UNIFYCR_MAX_FILENAME);
 
         if (rc != 0) {
-            DEBUG("rank:%d, fail to get the host name.", dbg_rank);
+            printf("rank:%d, fail to get the host name.", dbg_rank);
             return UNIFYCR_FAILURE;
         }
     }
@@ -2571,17 +2585,19 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
     char addr_string[50];
     fp = fopen("/dev/shm/svr_id","r");
     fscanf(fp, "%s", addr_string);
+	printf("rpc address: %s\n", addr_string);
     fclose(fp);
 
     unifycr_client_rpc_init(addr_string, &unifycr_rpc_context);
 
     //TODO: call client rpc function here (which calls unifycr_sync_to_del
+    printf("calling mount\n");
     unifycr_client_mount_rpc_invoke(&unifycr_rpc_context);
 
     int rc = unifycr_init_socket(local_rank_idx, local_rank_cnt,
                                 local_del_cnt);
     if (rc < 0) {
-        DEBUG("rank:%d, fail to initialize socket.", dbg_rank);
+        printf("rank:%d, fail to initialize socket, rc == %d.", dbg_rank, rc);
         return UNIFYCR_FAILURE;
     }
 
@@ -2589,6 +2605,7 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
     /* add mount point as a new directory in the file list */
     if (unifycr_get_fid_from_path(prefix) >= 0) {
         /* we can't mount this location, because it already exists */
+		printf("we can't mount this location, because it already exists\n");
         errno = EEXIST;
         return -1;
     } else {
