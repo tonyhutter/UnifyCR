@@ -3,6 +3,12 @@ lib_LTLIBRARIES = libunifycr.la libunifycr_gotcha.la
 libunifycrdir = $(includedir)
 libunifycr_gotchadir = $(includedir)
 
+nodist_unifycr_SOURCES = ucr_read_builder.h
+BUILT_SOURCES = ucr_read_builder.h
+#CLEANFILES = ucr_read_builder.h
+ucr_read_builder.h: /g/g0/sikich1/UnifyCR/client/src/ucr_read.fbs
+	/g/g0/sikich1/flatcc/bin/flatcc -o. -c -a /g/g0/sikich1/UnifyCR/client/src/ucr_read.fbs
+
 libunifycr_HEADERS = unifycr.h
 libunifycr_la_SOURCES = \
   unifycr-fixed.c \
