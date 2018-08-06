@@ -4,6 +4,16 @@ Build & I/O Interception
 
 In this section, we describe how to build UnifyCR with I/O interception.
 
+.. note::
+
+    The current version of UnifyCR adopts the mdhim key-value store, which strictly
+    requires:
+
+    "An MPI distribution that supports MPI_THREAD_MULTIPLE and per-object locking of
+    critical sections (this excludes OpenMPI up to version 3.0.1, the current version as of this writing)"
+
+    as specified in the project `github <https://github.com/mdhim/mdhim-tng>`_
+
 ---------------------------
 How to build UnifyCR
 ---------------------------
@@ -30,7 +40,7 @@ If you use Dotkit then replace ``spack load`` with ``spack use``.
     $ git clone https://github.com/spack/spack
     $ ./spack/bin/spack install leveldb
     $ ./spack/bin/spack install gotcha
-    $ ./spack/bin/spack spack install environment-modules
+    $ ./spack/bin/spack install environment-modules
     $ . spack/share/spack/setup-env.sh
     $ spack load leveldb
     $ spack load gotcha
@@ -50,11 +60,36 @@ Then to build UnifyCR:
 For users who cannot use Spack, you may fetch the latest release of
 `GOTCHA <https://github.com/LLNL/GOTCHA>`_
 
-Then to build with UnifyCR:
+And leveldb (if not already installed on your system):
+`leveldb <https://github.com/google/leveldb/releases/tag/v1.20>`_
+
+If you installed leveldb from source then you may have to add the pkgconfig file
+for leveldb manually. This is assuming your install of leveldb does not contain
+a .pc file (it usually doesn't). Then, add the path to that file to
+PKG_CONFIG_PATH.
 
 .. code-block:: Bash
 
-    $ ./configure --prefix=/path/to/install --with-gotcha=/path/to/gotcha --enable-debug
+    $ cat leveldb.pc
+    #leveldb.pc
+    prefix=/path/to/leveldb/install
+    exec_prefix=/path/to/leveldb/install
+    libdir=/path/to/leveldb/install/lib64
+    includedir=/path/to/leveldb/install/include
+    Name: leveldb
+    Description: a fast key-value storage library
+    Version: 1.20
+    Cflags: -I${includedir}
+    Libs: -L${libdir} -lleveldb
+
+    $ export PKG_CONFIG_PATH=/path/to/leveldb/pkgconfig
+
+Leave out the path to leveldb in your configure line if you didn't install it
+from source.
+
+.. code-block:: Bash
+
+    $ ./configure --prefix=/path/to/install --with-gotcha=/path/to/gotcha --enable-debug --with-leveldb=/path/to/leveldb
     $ make
     $ make install
 

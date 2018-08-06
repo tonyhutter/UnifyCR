@@ -38,6 +38,7 @@
 #include <assert.h>
 #include "log.h"
 #include "unifycr_global.h"
+#include "unifycr_meta.h"
 #include "unifycr_cmd_handler.h"
 #include "unifycr_request_manager.h"
 #include "unifycr_setup.h"
@@ -160,6 +161,7 @@ int pack_ack_msg(char *ptr_cmd, int cmd, int rc, void *val,
 {
     int ret_sz = 0;
 
+    memset(ptr_cmd, 0, CMD_BUF_SIZE);
     memcpy(ptr_cmd, &cmd, sizeof(int));
     ret_sz += sizeof(int);
     memcpy(ptr_cmd + sizeof(int), &rc, sizeof(int));
@@ -450,7 +452,7 @@ int sync_with_client(char *cmd_buf, int sock_id)
                             superblock_sz, num_procs_per_node, req_buf_sz, data_size); */
         tmp_config = (app_config_t *)malloc(sizeof(app_config_t));
         memcpy(tmp_config->external_spill_dir,
-               cmd_buf + cursor, MAX_PATH_LEN);
+               cmd_buf + cursor, UNIFYCR_MAX_FILENAME);
 
         /*don't forget to free*/
         tmp_config->num_procs_per_node = num_procs_per_node;
@@ -501,18 +503,18 @@ int sync_with_client(char *cmd_buf, int sock_id)
     cli_signature->sock_id = sock_id;
     rc = pthread_mutex_init(&(thrd_ctrl->thrd_lock), NULL);
     if (rc != 0) {
-        return ULFS_ERROR_THRDINIT;
+        return (int)UNIFYCR_ERROR_THRDINIT;
     }
 
     rc = pthread_cond_init(&(thrd_ctrl->thrd_cond), NULL);
     if (rc != 0) {
-        return ULFS_ERROR_THRDINIT;
+        return (int)UNIFYCR_ERROR_THRDINIT;
     }
 
     thrd_ctrl->del_req_set =
         (msg_meta_t *)malloc(sizeof(msg_meta_t));
     if (!thrd_ctrl->del_req_set) {
-        return ULFS_ERROR_NOMEM;
+        return (int)UNIFYCR_ERROR_NOMEM;
     }
     memset(thrd_ctrl->del_req_set,
            0, sizeof(msg_meta_t));
@@ -520,14 +522,14 @@ int sync_with_client(char *cmd_buf, int sock_id)
     thrd_ctrl->del_req_stat =
         (del_req_stat_t *)malloc(sizeof(del_req_stat_t));
     if (!thrd_ctrl->del_req_stat) {
-        return ULFS_ERROR_NOMEM;
+        return (int)UNIFYCR_ERROR_NOMEM;
     }
     memset(thrd_ctrl->del_req_stat, 0, sizeof(del_req_stat_t));
 
     thrd_ctrl->del_req_stat->req_stat =
         (per_del_stat_t *)malloc(sizeof(per_del_stat_t) * glb_size);
     if (!thrd_ctrl->del_req_stat->req_stat) {
-        return ULFS_ERROR_NOMEM;
+        return (int)UNIFYCR_ERROR_NOMEM;
     }
     memset(thrd_ctrl->del_req_stat->req_stat,
            0, sizeof(per_del_stat_t) * glb_size);
@@ -557,7 +559,7 @@ int sync_with_client(char *cmd_buf, int sock_id)
     rc = pthread_create(&(thrd_ctrl->thrd), NULL, rm_delegate_request_thread,
                         cli_signature);
     if (rc != 0) {
-        return  ULFS_ERROR_THRDINIT;
+        return (int)UNIFYCR_ERROR_THRDINIT;
     }
 
     return rc;
@@ -587,11 +589,11 @@ int attach_to_shm(app_config_t *app_config, int app_id, int client_side_id)
     int tmp_fd = shm_open(shm_name,
                           MMAP_OPEN_FLAG, MMAP_OPEN_MODE);
     if (-1 == (ret = tmp_fd)) {
-        return ULFS_ERROR_SHMEM;
+        return (int)UNIFYCR_ERROR_SHMEM;
     }
     ret = ftruncate(tmp_fd, app_config->superblock_sz);
     if (-1 == ret) {
-        return ULFS_ERROR_SHMEM;
+        return (int)UNIFYCR_ERROR_SHMEM;
     }
     app_config->shm_superblock_fds[client_side_id] = tmp_fd;
 
@@ -600,7 +602,7 @@ int attach_to_shm(app_config_t *app_config, int app_id, int client_side_id)
         mmap(NULL, app_config->superblock_sz, PROT_READ | PROT_WRITE,
              MAP_SHARED, tmp_fd, SEEK_SET);
     if (NULL == app_config->shm_superblocks[client_side_id]) {
-        return ULFS_ERROR_SHMEM;
+        return (int)UNIFYCR_ERROR_SHMEM;
     }
 
     /* attach shared request buffer,
@@ -611,12 +613,12 @@ int attach_to_shm(app_config_t *app_config, int app_id, int client_side_id)
     sprintf(shm_name, "%d-req-%d", app_id, client_side_id);
     tmp_fd = shm_open(shm_name, MMAP_OPEN_FLAG, MMAP_OPEN_MODE);
     if (-1 == (ret = tmp_fd)) {
-        return ULFS_ERROR_SHMEM;
+        return (int)UNIFYCR_ERROR_SHMEM;
     }
 
     ret = ftruncate(tmp_fd, app_config->req_buf_sz);
     if (-1 == ret) {
-        return ULFS_ERROR_SHMEM;
+        return (int)UNIFYCR_ERROR_SHMEM;
     }
     app_config->shm_req_fds[client_side_id] = tmp_fd;
 
@@ -625,7 +627,7 @@ int attach_to_shm(app_config_t *app_config, int app_id, int client_side_id)
             app_config->req_buf_sz, PROT_READ | PROT_WRITE,
             MAP_SHARED, tmp_fd, SEEK_SET);
     if (NULL == app_config->shm_req_bufs[client_side_id]) {
-        return ULFS_ERROR_SHMEM;
+        return (int)UNIFYCR_ERROR_SHMEM;
     }
 
 
@@ -640,11 +642,11 @@ int attach_to_shm(app_config_t *app_config, int app_id, int client_side_id)
 
     tmp_fd = shm_open(shm_name, MMAP_OPEN_FLAG, MMAP_OPEN_MODE);
     if (-1 == (ret = tmp_fd)) {
-        return ULFS_ERROR_SHMEM;
+        return (int)UNIFYCR_ERROR_SHMEM;
     }
     ret = ftruncate(tmp_fd, app_config->recv_buf_sz);
     if (-1 == ret) {
-        return ULFS_ERROR_SHMEM;
+        return (int)UNIFYCR_ERROR_SHMEM;
     }
     app_config->shm_recv_fds[client_side_id] = tmp_fd;
 
@@ -653,7 +655,7 @@ int attach_to_shm(app_config_t *app_config, int app_id, int client_side_id)
         mmap(NULL, app_config->recv_buf_sz, PROT_READ | PROT_WRITE,
              MAP_SHARED, tmp_fd, SEEK_SET);
     if (NULL == app_config->shm_recv_bufs[client_side_id]) {
-        return ULFS_ERROR_SHMEM;
+        return (int)UNIFYCR_ERROR_SHMEM;
     }
 
     return ULFS_SUCCESS;
@@ -676,7 +678,7 @@ int open_log_file(app_config_t *app_config,
     //int client_side_id = app_config->client_ranks[sock_id];
     char path[GEN_STR_LEN] = {0};
     sprintf(path, "%s/spill_%d_%d.log",
-            app_config->external_spill_dir, app_id, client_side_id);
+    app_config->external_spill_dir, app_id, client_side_id);
     app_config->spill_log_fds[client_side_id] = open(path, O_RDONLY, 0666);
     printf("openning log file %s, client_side_id:%d\n",
                 path, client_side_id);
@@ -684,10 +686,10 @@ int open_log_file(app_config_t *app_config,
     if (app_config->spill_log_fds[client_side_id] < 0) {
         printf("rank:%d, openning file %s failure\n", glb_rank, path);
         fflush(stdout);
-        return ULFS_ERROR_FILE;
+        return (int)UNIFYCR_ERROR_FILE;
     }
 
-    sprintf(path, "%s/spill_index_%d_%d.log",
+    snprintf(path, sizeof(path), "%s/spill_index_%d_%d.log",
             app_config->external_spill_dir, app_id, client_side_id);
     app_config->spill_index_log_fds[client_side_id] =
         open(path, O_RDONLY, 0666);
@@ -699,7 +701,7 @@ int open_log_file(app_config_t *app_config,
     if (app_config->spill_index_log_fds[client_side_id] < 0) {
         printf("rank:%d, openning index file %s failure\n", glb_rank, path);
         fflush(stdout);
-        return ULFS_ERROR_FILE;
+        return (int)UNIFYCR_ERROR_FILE;
     }
 
     return ULFS_SUCCESS;

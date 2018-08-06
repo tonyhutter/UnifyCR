@@ -62,6 +62,7 @@
 #include <pthread.h>
 
 #include "unifycr-internal.h"
+#include "unifycr_meta.h"
 
 extern int dbgrank;
 extern unifycr_index_buf_t unifycr_indices;
@@ -175,7 +176,7 @@ static int unifycr_chunk_alloc(int fid, unifycr_filemeta_t *meta, int chunk_id)
             unifycr_stack_unlock();
             if (id < unifycr_max_chunks) {
                 DEBUG("spill-over device out of space (%d)\n", id);
-                return UNIFYCR_ERR_NOSPC;
+                return UNIFYCR_ERROR_NOSPC;
             }
 
             /* got one from spill over */
@@ -184,7 +185,7 @@ static int unifycr_chunk_alloc(int fid, unifycr_filemeta_t *meta, int chunk_id)
         } else {
             /* spill over isn't available, so we're out of space */
             DEBUG("memfs out of space (%d)\n", id);
-            return UNIFYCR_ERR_NOSPC;
+            return UNIFYCR_ERROR_NOSPC;
         }
     } else if (unifycr_use_spillover) {
         /* memory file system is not enabled, but spill over is */
@@ -199,7 +200,7 @@ static int unifycr_chunk_alloc(int fid, unifycr_filemeta_t *meta, int chunk_id)
         unifycr_stack_unlock();
         if (id < unifycr_max_chunks) {
             DEBUG("spill-over device out of space (%d)\n", id);
-            return UNIFYCR_ERR_NOSPC;
+            return UNIFYCR_ERROR_NOSPC;
         }
 
         /* got one from spill over */
@@ -208,7 +209,7 @@ static int unifycr_chunk_alloc(int fid, unifycr_filemeta_t *meta, int chunk_id)
     } else {
         /* don't know how to allocate chunk */
         chunk_meta->location = CHUNK_LOCATION_NULL;
-        return UNIFYCR_ERR_IO;
+        return UNIFYCR_ERROR_IO;
     }
 
     return UNIFYCR_SUCCESS;
@@ -233,7 +234,7 @@ static int unifycr_chunk_free(int fid, unifycr_filemeta_t *meta, int chunk_id)
     } else {
         /* unkwown chunk location */
         DEBUG("unknown chunk location %d\n", chunk_meta->location);
-        return UNIFYCR_ERR_IO;
+        return UNIFYCR_ERROR_IO;
     }
 
     /* update location of chunk */
@@ -269,7 +270,7 @@ static int unifycr_chunk_read(
     } else {
         /* unknown chunk type */
         DEBUG("unknown chunk type in read\n");
-        return UNIFYCR_ERR_IO;
+        return UNIFYCR_ERROR_IO;
     }
 
     /* assume read was successful if we get to here */
@@ -375,13 +376,14 @@ static int unifycr_logio_chunk_write(
         cur_idx.length = count;
 
         /* find the corresponding file attr entry and update attr*/
-        unifycr_fattr_t tmp_meta_entry;
+        unifycr_file_attr_t tmp_meta_entry;
         tmp_meta_entry.fid = fid;
-        unifycr_fattr_t *ptr_meta_entry
-            = (unifycr_fattr_t *)bsearch(&tmp_meta_entry,
+        unifycr_file_attr_t *ptr_meta_entry
+            = (unifycr_file_attr_t *)bsearch(&tmp_meta_entry,
                                          unifycr_fattrs.meta_entry,
                                          *unifycr_fattrs.ptr_num_entries,
-                                         sizeof(unifycr_fattr_t), compare_fattr);
+                                         sizeof(unifycr_file_attr_t),
+					 compare_fattr);
         if (ptr_meta_entry !=  NULL) {
             ptr_meta_entry->file_attr.st_size = pos + count;
         }
@@ -455,12 +457,14 @@ static int unifycr_logio_chunk_write(
         cur_idx.length = count;
 
         /* find the corresponding file attr entry and update attr*/
-        unifycr_fattr_t tmp_meta_entry;
+        unifycr_file_attr_t tmp_meta_entry;
         tmp_meta_entry.fid = fid;
-        unifycr_fattr_t *ptr_meta_entry
-            = (unifycr_fattr_t *)bsearch(&tmp_meta_entry,
-                                         unifycr_fattrs.meta_entry, *unifycr_fattrs.ptr_num_entries,
-                                         sizeof(unifycr_fattr_t), compare_fattr);
+        unifycr_file_attr_t *ptr_meta_entry
+            = (unifycr_file_attr_t *)bsearch(&tmp_meta_entry,
+                                         unifycr_fattrs.meta_entry,
+					 *unifycr_fattrs.ptr_num_entries,
+                                         sizeof(unifycr_file_attr_t),
+					 compare_fattr);
         if (ptr_meta_entry !=  NULL) {
             ptr_meta_entry->file_attr.st_size = pos + count;
         }
@@ -511,7 +515,7 @@ static int unifycr_logio_chunk_write(
     } else {
         /* unknown chunk type */
         DEBUG("unknown chunk type in read\n");
-        return UNIFYCR_ERR_IO;
+        return UNIFYCR_ERROR_IO;
     }
 
     /* assume read was successful if we get to here */
@@ -550,7 +554,7 @@ static int unifycr_chunk_write(
     } else {
         /* unknown chunk type */
         DEBUG("unknown chunk type in read\n");
-        return UNIFYCR_ERR_IO;
+        return UNIFYCR_ERROR_IO;
     }
 
     /* assume read was successful if we get to here */
@@ -574,13 +578,13 @@ int unifycr_fid_store_fixed_extend(int fid, unifycr_filemeta_t *meta,
         while (additional > 0) {
             /* check that we don't overrun max number of chunks for file */
             if (meta->chunks == unifycr_max_chunks + unifycr_spillover_max_chunks) {
-                return UNIFYCR_ERR_NOSPC;
+                return UNIFYCR_ERROR_NOSPC;
             }
             /* allocate a new chunk */
             int rc = unifycr_chunk_alloc(fid, meta, meta->chunks);
             if (rc != UNIFYCR_SUCCESS) {
                 DEBUG("failed to allocate chunk\n");
-                return UNIFYCR_ERR_NOSPC;
+                return UNIFYCR_ERROR_NOSPC;
             }
 
             /* increase chunk count and subtract bytes from the number we need */
@@ -673,7 +677,7 @@ int unifycr_fid_store_fixed_write(int fid, unifycr_filemeta_t *meta, off_t pos,
         chunk_id = meta->size >> unifycr_chunk_bits;
         chunk_offset = meta->size & unifycr_chunk_mask;
     } else {
-        return UNIFYCR_ERR_IO;
+        return UNIFYCR_ERROR_IO;
     }
 
     /* determine how many bytes remain in the current chunk */
@@ -686,7 +690,7 @@ int unifycr_fid_store_fixed_write(int fid, unifycr_filemeta_t *meta, off_t pos,
             rc = unifycr_logio_chunk_write(fid, pos, meta, chunk_id, chunk_offset,
                                            buf, count);
         } else {
-            return UNIFYCR_ERR_IO;
+            return UNIFYCR_ERROR_IO;
         }
     } else {
         /* otherwise, fill up the remainder of the current chunk */
@@ -697,7 +701,7 @@ int unifycr_fid_store_fixed_write(int fid, unifycr_filemeta_t *meta, off_t pos,
             rc = unifycr_logio_chunk_write(fid, pos, meta, chunk_id, chunk_offset,
                                            (void *)ptr, remaining);
         } else {
-            return UNIFYCR_ERR_IO;
+            return UNIFYCR_ERROR_IO;
         }
 
         ptr += remaining;
@@ -723,7 +727,7 @@ int unifycr_fid_store_fixed_write(int fid, unifycr_filemeta_t *meta, off_t pos,
                 rc = unifycr_logio_chunk_write(fid, pos, meta, chunk_id, 0,
                                                (void *)ptr, num);
             else {
-                return UNIFYCR_ERR_IO;
+                return UNIFYCR_ERROR_IO;
             }
             ptr += num;
             pos += num;

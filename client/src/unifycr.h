@@ -61,16 +61,17 @@ typedef struct {
 
 /*data structures defined for unifycr********************/
 
-#define MMAP_OPEN_FLAG O_RDWR|O_CREAT
-#define MMAP_OPEN_MODE 00777
-
 typedef struct {
     char hostname[HOST_NAME_MAX];
     int rank;
 } name_rank_pair_t;
 
+#if 0
 int unifycr_mount(const char prefix[], int rank, size_t size,
                   int l_app_id, int subtype);
+#endif
+int unifycr_mount(const char prefix[], int rank, size_t size,
+                  int l_app_id);
 int unifycr_unmount(void);
 int compare_fattr(const void *a, const void *b);
 

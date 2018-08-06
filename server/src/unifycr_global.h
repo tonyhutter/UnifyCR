@@ -29,9 +29,10 @@
 
 #ifndef UNIFYCR_GLOBAL_H
 #define UNIFYCR_GLOBAL_H
+
 #include <pthread.h>
 #include <stdlib.h>
-#include "unifycr_const.h"
+#include "unifycr_configurator.h"
 #include "arraylist.h"
 
 typedef enum {
@@ -103,12 +104,12 @@ typedef struct {
     int spill_log_fds[MAX_NUM_CLIENTS];
     int spill_index_log_fds[MAX_NUM_CLIENTS];
     int dbg_ranks[MAX_NUM_CLIENTS];
-    char external_spill_dir[MAX_PATH_LEN];
-    char recv_buf_name[MAX_NUM_CLIENTS][MAX_PATH_LEN];
-    char req_buf_name[MAX_NUM_CLIENTS][MAX_PATH_LEN];
-    char super_buf_name[MAX_NUM_CLIENTS][MAX_PATH_LEN];
-    char spill_log_name[MAX_NUM_CLIENTS][MAX_PATH_LEN];
-    char spill_index_log_name[MAX_NUM_CLIENTS][MAX_PATH_LEN];
+    char external_spill_dir[UNIFYCR_MAX_FILENAME];
+    char recv_buf_name[MAX_NUM_CLIENTS][UNIFYCR_MAX_FILENAME];
+    char req_buf_name[MAX_NUM_CLIENTS][UNIFYCR_MAX_FILENAME];
+    char super_buf_name[MAX_NUM_CLIENTS][UNIFYCR_MAX_FILENAME];
+    char spill_log_name[MAX_NUM_CLIENTS][UNIFYCR_MAX_FILENAME];
+    char spill_index_log_name[MAX_NUM_CLIENTS][UNIFYCR_MAX_FILENAME];
 } app_config_t;
 
 typedef struct {
@@ -149,23 +150,20 @@ typedef struct {
 typedef int fattr_key_t;
 
 typedef struct {
-    char fname[ULFS_MAX_FILENAME];
+    char fname[UNIFYCR_MAX_FILENAME];
     struct stat file_attr;
 } fattr_val_t;
 
-typedef struct {
-    int fid;
-    int gfid;
-    char filename[ULFS_MAX_FILENAME];
-    struct stat file_attr;
-} unifycr_file_attr_t;
 extern arraylist_t *app_config_list;
 extern arraylist_t *thrd_list;
+
 int invert_sock_ids[MAX_NUM_CLIENTS];
+
 extern pthread_t data_thrd;
 extern int glb_rank, glb_size;
 extern int local_rank_idx;
 extern int *local_rank_lst;
 extern int local_rank_cnt;
 extern long max_recs_per_slice;
+
 #endif

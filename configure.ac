@@ -17,6 +17,7 @@ AM_SILENT_RULES([yes])
 AM_MAINTAINER_MODE([disable])
 
 AC_PROG_CC([mpicc])
+AC_PROG_CC_STDC
 AC_PROG_AWK
 AC_PROG_CPP
 AC_PROG_INSTALL
@@ -58,7 +59,7 @@ AC_FUNC_REALLOC
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([ftruncate getpagesize gettimeofday memset socket floor])
 AC_CHECK_FUNCS([gethostbyname strcasecmp strdup strerror strncasecmp strrchr])
-AC_CHECK_FUNCS([gethostname strstr strtoumax strtol uname])
+AC_CHECK_FUNCS([gethostname strstr strtoumax strtol uname posix_fallocate])
 
 # Debug build
 AC_ARG_ENABLE([debug],
@@ -75,7 +76,6 @@ fi
 AC_SUBST(CFLAGS)
 
 CHECK_NUMA
-CHECK_ARCH
 
 AC_ARG_WITH(pkgconfigdir,
             [  --with-pkgconfigdir=DIR      pkgconfig file in DIR @<:@LIBDIR/pkgconfig@:>@],
@@ -268,6 +268,11 @@ eval unifycr_bin_path=$bindir
 prefix=$savePrefix
 exec_prefix=$saveExecprefix
 
+# autoconf<=2.69, runstatedir is not configurable.
+if test "x$runstatedir" = x; then
+        AC_SUBST([runstatedir], ['${localstatedir}/run'])
+fi
+
 CFLAGS="$old_cflags"
 LIBS="$old_libs"
 
@@ -281,6 +286,8 @@ AC_OUTPUT(client/unifycr-config)
 AC_OUTPUT(client/unifycr-runtime-config.h)
 
 AC_CONFIG_FILES([Makefile
+                 common/Makefile
+                 common/src/Makefile
                  meta/Makefile
                  meta/src/Makefile
                  server/Makefile
@@ -288,9 +295,14 @@ AC_CONFIG_FILES([Makefile
                  client/Makefile
                  client/src/Makefile
                  client/tests/Makefile
+                 client/unifycr.pc
+                 extras/Makefile
+                 extras/unifycr.conf
                  t/Makefile
                  t/lib/Makefile
-                 client/unifycr.pc])
+                 util/Makefile
+                 util/unifycr/Makefile
+                 util/unifycr/src/Makefile])
 
 UNIFYCR_VERSION=${PACKAGE_VERSION}
 AC_SUBST(UNIFYCR_VERSION)

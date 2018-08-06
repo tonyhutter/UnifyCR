@@ -65,12 +65,16 @@
 #include "utlist.h"
 #include "uthash.h"
 
+
+#include "unifycr_configurator.h"
+#include "unifycr_meta.h"
+
 /* -------------------------------
  * Defines and types
  * ------------------------------- */
 
-/* TODO: move common includes to another file */
-#include "unifycr-defs.h"
+extern int unifycr_debug_level;
+
 #define DEBUG(fmt, ...) \
 do { \
     if (unifycr_debug_level > 0) \
@@ -167,21 +171,6 @@ do { \
 
 #endif
 
-#define UNIFYCR_SUCCESS     0
-#define UNIFYCR_FAILURE    -1
-#define UNIFYCR_ERR_NOSPC  -2
-#define UNIFYCR_ERR_IO     -3
-#define UNIFYCR_ERR_NAMETOOLONG -4
-#define UNIFYCR_ERR_NOENT  -5
-#define UNIFYCR_ERR_EXIST  -6
-#define UNIFYCR_ERR_NOTDIR -7
-#define UNIFYCR_ERR_NFILE  -8
-#define UNIFYCR_ERR_INVAL  -9
-#define UNIFYCR_ERR_OVERFLOW -10
-#define UNIFYCR_ERR_FBIG   -11
-#define UNIFYCR_ERR_BADF   -12
-#define UNIFYCR_ERR_ISDIR  -13
-#define UNIFYCR_ERR_NOMEM  -14
 
 #ifndef HAVE_OFF64_T
 typedef int64_t off64_t;
@@ -282,39 +271,21 @@ typedef struct {
 } shm_meta_t; /*metadata format in the shared memory*/
 
 typedef struct {
-    off_t file_pos;
-    off_t mem_pos;
-    size_t length;
-    int fid;
-} unifycr_index_t;
-
-typedef struct {
     off_t *ptr_num_entries;
     unifycr_index_t *index_entry;
 } unifycr_index_buf_t;
 
-typedef struct {
-    int fid;
-    int gfid;
-    char filename[UNIFYCR_MAX_FILENAME];
-    struct stat file_attr;
-} unifycr_fattr_t;
+
 
 typedef struct {
     off_t *ptr_num_entries;
-    unifycr_fattr_t *meta_entry;
+    unifycr_file_attr_t *meta_entry;
 } unifycr_fattr_buf_t;
 
 typedef struct {
     unifycr_index_t idxes[UNIFYCR_MAX_SPLIT_CNT];
     int count;
 } index_set_t;
-
-typedef enum {
-    UNIFYCRFS,
-    UNIFYCR_LOG,
-    UNIFYCR_STRIPE,
-} fs_type_t;
 
 typedef struct {
     read_req_t read_reqs[UNIFYCR_MAX_READ_CNT];
@@ -335,8 +306,7 @@ extern long shm_req_size;
 extern long shm_recv_size;
 extern char *shm_recvbuf;
 extern char *shm_reqbuf;
-extern fs_type_t fs_type;
-extern char cmd_buf[GEN_STR_LEN];
+extern char cmd_buf[CMD_BUF_SIZE];
 extern char ack_msg[3];
 extern unifycr_fattr_buf_t unifycr_fattrs;
 

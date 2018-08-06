@@ -1,4 +1,4 @@
-libexec_PROGRAMS = test_write_gotcha test_read_gotcha test_listread_gotcha test_write_static test_read_static test_listread_static
+libexec_PROGRAMS = test_write_gotcha test_read_gotcha test_listread_gotcha test_mpiio_gotcha test_write_static test_read_static test_listread_static test_mpiio_static
 
 test_gotcha_ldadd = ../src/libunifycr_gotcha.la
 test_static_ldadd = ../src/libunifycr.la
@@ -20,6 +20,11 @@ test_listread_gotcha_CPPFLAGS = $(test_cppflags)
 test_listread_gotcha_LDADD   = $(test_gotcha_ldadd)
 test_listread_gotcha_LDFLAGS = $(AM_LDFLAGS)
 
+test_mpiio_gotcha_SOURCES = test_mpiio.c
+test_mpiio_gotcha_CPPFLAGS = $(test_cppflags)
+test_mpiio_gotcha_LDADD   = $(test_gotcha_ldadd)
+test_mpiio_gotcha_LDFLAGS = $(AM_LDFLAGS)
+
 test_write_static_SOURCES = test_write.c
 test_write_static_CPPFLAGS = $(test_cppflags)
 test_write_static_LDADD   = $(test_static_ldadd)
@@ -34,5 +39,10 @@ test_listread_static_SOURCES = test_listread.c
 test_listread_static_CPPFLAGS = $(test_cppflags)
 test_listread_static_LDADD   = $(test_static_ldadd)
 test_listread_static_LDFLAGS = $(test_static_ldflags)
+
+test_mpiio_static_SOURCES = test_mpiio.c
+test_mpiio_static_CPPFLAGS = $(test_cppflags)
+test_mpiio_static_LDADD   = $(test_static_ldadd)
+test_mpiio_static_LDFLAGS = $(test_static_ldflags)
 
 
