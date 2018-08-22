@@ -51,6 +51,9 @@ int main(int argc, char *argv[]) {
 	MPI_Comm_size(MPI_COMM_WORLD, &rank_num);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+	printf("rank_num == %d\n", rank_num);
+	printf("rank == %d\n", rank);
+
 	while((c = getopt(argc, argv, opts)) != -1){
 		switch (c)  {
 			case 'b': /*size of block*/
@@ -75,7 +78,7 @@ int main(int argc, char *argv[]) {
     struct aiocb **cb_list = (struct aiocb **)malloc (num_reqs * \
       sizeof (struct aiocb *)); /*list of read requests in lio_listio*/
 
-    int mnt_success = unifycr_mount("/tmp", rank, rank_num, 1, 1);
+    int mnt_success = unifycr_mount("/tmp", rank, rank_num, 0, 1);
 
     if (mnt_success != 0 && rank == 0) {
         printf("unifycr mount call failed\n");
@@ -107,7 +110,6 @@ int main(int argc, char *argv[]) {
 					rank * blk_sz + j * tran_sz;
 			else if (pat == 1)
 				offset = i * blk_sz + j * tran_sz;
-			cursor += tran_sz;
 			lseek(fd, offset, SEEK_SET);
 			rc = read(fd, read_buf + cursor, tran_sz);
 			if (rc < 0) {
@@ -115,6 +117,11 @@ int main(int argc, char *argv[]) {
 				fflush(stdout);
 				return -1;
 			}
+			int k;
+			for (k = 0; k < tran_sz; k++)
+				if ( read_buf[cursor+k] != i )
+					printf("mismatch! i = %d, buf = %hhd, k = %d\n", i, read_buf[cursor+k],k);
+			cursor += tran_sz;
 		}
 	}
 	gettimeofday(&read_end, NULL);
@@ -150,6 +157,6 @@ int main(int argc, char *argv[]) {
 			fflush(stdout);
 	}
 
-	MPI_Finalize();
+	// MPI_Finalize();
 
 }

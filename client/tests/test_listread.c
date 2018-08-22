@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
 		  }
 	}
 
-	num_reqs = blk_sz*seg_num/tran_sz;
+	num_reqs = (blk_sz*seg_num/tran_sz)/2;
 	char *read_buf = malloc(blk_sz * seg_num); /*read buffer*/
     struct aiocb *aiocb_list = (struct aiocb *)malloc(num_reqs\
         * sizeof(struct aiocb));
@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
       sizeof (struct aiocb *)); /*list of read requests in lio_listio*/
 
 	unifycr_mount("/tmp", rank, rank_num,\
-	  		1, 1);
+	  		0, 1);
 
 	if (pat == 1) {
 		sprintf(tmpfname, "%s%d", fname, rank);
@@ -143,13 +143,13 @@ int main(int argc, char *argv[]) {
 		if (pat == 1) { /* N-N */
 			long i, j, offset, rc;
 
-			for (i = 0; i < seg_num; i++) {
+			for (i = 0; i < seg_num/2; i++) {
 					for (j=0; j<blk_sz/tran_sz; j++ ) {
 					  index = i * (blk_sz/tran_sz) + j;
 					  aiocb_list[index].aio_fildes = fd;
 					  aiocb_list[index].aio_buf = read_buf + index * tran_sz;
 					  aiocb_list[index].aio_nbytes = tran_sz;
-					  aiocb_list[index].aio_offset = i * blk_sz + j * tran_sz;
+					  aiocb_list[index].aio_offset = i * 2 * blk_sz + j * tran_sz;
 					  aiocb_list[index].aio_lio_opcode = LIO_READ;
 					  cb_list[index] = &aiocb_list[index];
 					}

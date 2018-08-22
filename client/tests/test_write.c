@@ -143,6 +143,7 @@ int main(int argc, char *argv[]) {
 				return -1;
 			}
 		}
+		memset(buf,i+1,tran_sz);
 	}
 
 	gettimeofday(&meta_start, NULL);
