@@ -1731,11 +1731,11 @@ static int unifycr_init(int rank)
          * file descriptor number that can be opened by this process */
         struct rlimit *r_limit = malloc(sizeof(r_limit));
         if (r_limit == NULL) {
-            perror("failed to allocate memory for call to getrlimit");
+            printf("failed to allocate memory for call to getrlimit\n");
             return UNIFYCR_FAILURE;
         }
         if (getrlimit(RLIMIT_NOFILE, r_limit) < 0) {
-            perror("rlimit failed");
+            printf("rlimit failed\n");
             free(r_limit);
             return UNIFYCR_FAILURE;
         }
@@ -1793,7 +1793,7 @@ static int unifycr_init(int rank)
                              unifycr_mount_shmget_key);
 #endif /* MACHINE_BGQ */
         if (unifycr_superblock == NULL) {
-            DEBUG("unifycr_superblock_shmget() failed\n");
+            printf("unifycr_superblock_shmget() failed\n");
             return UNIFYCR_FAILURE;
         }
         char spillfile_prefix[100];
@@ -1803,7 +1803,7 @@ static int unifycr_init(int rank)
 			//printf("setting external_data_dir to [%s]\n", env);
             strcpy(external_data_dir, env);
         } else {
-            DEBUG("UNIFYCR_EXTERNAL_DATA_DIR not set to an existing writable"
+            printf("UNIFYCR_EXTERNAL_DATA_DIR not set to an existing writable"
                   " path (i.e UNIFYCR_EXTERNAL_DATA_DIR=/ccs/home/ogm/ssd):\n");
             return UNIFYCR_FAILURE;
         }
@@ -1818,7 +1818,7 @@ static int unifycr_init(int rank)
                                      spillfile_prefix);
 
             if (unifycr_spilloverblock < 0) {
-                DEBUG("unifycr_get_spillblock() failed!\n");
+                printf("unifycr_get_spillblock() failed!\n");
                 return UNIFYCR_FAILURE;
             }
         }
@@ -1827,7 +1827,7 @@ static int unifycr_init(int rank)
         if (env) {
             strcpy(external_meta_dir, env);
         } else {
-            DEBUG("UNIFYCR_EXTERNAL_META_DIR not set to an existing writable"
+            printf("UNIFYCR_EXTERNAL_META_DIR not set to an existing writable"
                   " path (i.e UNIFYCR_EXTERNAL_META_DIR=/ccs/home/ogm/ssd):\n");
             return UNIFYCR_FAILURE;
         }
@@ -1839,7 +1839,7 @@ static int unifycr_init(int rank)
             unifycr_spillmetablock =
                 unifycr_get_spillblock(unifycr_index_buf_size, spillfile_prefix);
             if (unifycr_spillmetablock < 0) {
-               DEBUG("unifycr_get_spillmetablock failed!\n");
+               printf("unifycr_get_spillmetablock failed!\n");
                 return UNIFYCR_FAILURE;
             }
         }
@@ -2004,6 +2004,7 @@ static int unifycr_init_recv_shm(int local_rank_idx, int app_id)
         return UNIFYCR_FAILURE;
 
     *((int *)shm_recvbuf) = app_id + 3;
+	printf("shm_recbuf initialized\n");
     return 0;
 }
 
@@ -2151,7 +2152,7 @@ static int unifycr_client_rpc_init(char* svr_addr_str,
     /* initialize margo */
     printf("svr_addr_str:%s\n", svr_addr_str);
     (*unifycr_rpc_context)->mid = margo_init(proto, MARGO_CLIENT_MODE,
-                                             0, 0);
+                                             1, 0);
     assert((*unifycr_rpc_context)->mid);
     margo_diag_start((*unifycr_rpc_context)->mid);
 
@@ -2258,6 +2259,7 @@ static int unifycr_init_socket(int proc_id, int l_num_procs_per_node,
 
     /*which delegator I belong to*/
     sprintf(tmp_path, "%s%d", SOCKET_PATH, proc_id / nprocs_per_del);
+    printf("socket path: %s\n", tmp_path);
 
     strcpy(serv_addr.sun_path, tmp_path);
     len = sizeof(serv_addr);
@@ -2524,7 +2526,7 @@ static int CountTasksPerNode(int rank, int numTasks)
 int unifycrfs_mount(const char prefix[], size_t size, int rank)
 {
     char *env = getenv("UNIFYCR_USE_SINGLE_SHM");
-	printf("In mount!!\n");
+	//printf("In mount!!\n");
 
     unifycr_mount_prefix = strdup(prefix);
     unifycr_mount_prefixlen = strlen(unifycr_mount_prefix);
@@ -2569,8 +2571,10 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
     /* initialize our library */
     int ret = unifycr_init(rank);
 
-    if (ret != UNIFYCR_SUCCESS)
+    if (ret != UNIFYCR_SUCCESS) {
+		printf("failed with %d\n", ret);
         return ret;
+	}
     if (fs_type == UNIFYCR_LOG || fs_type == UNIFYCR_STRIPE) {
         char host_name[UNIFYCR_MAX_FILENAME] = {0};
         int rc = gethostname(host_name, UNIFYCR_MAX_FILENAME);
@@ -2601,6 +2605,18 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
         return UNIFYCR_FAILURE;
     }
 
+	rc = unifycr_init_req_shm(local_rank_idx, app_id);
+    if (rc < 0) {
+      printf("rank:%d, fail to init shared request memory.", dbg_rank);
+      return UNIFYCR_FAILURE;
+    }
+
+    rc = unifycr_init_recv_shm(local_rank_idx, app_id);
+    if (rc < 0) {
+      printf("rank:%d, fail to init shared receive memory.", dbg_rank);
+      return UNIFYCR_FAILURE;
+    }
+
     //TODO: //not sure if i need all of this..
     /* add mount point as a new directory in the file list */
     if (unifycr_get_fid_from_path(prefix) >= 0) {
@@ -2614,6 +2630,7 @@ int unifycrfs_mount(const char prefix[], size_t size, int rank)
 
         if (fid < 0) {
             /* if there was an error, return it */
+			printf("fid < 0\n");
             return fid;
         }
     }

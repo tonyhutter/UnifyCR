@@ -36,6 +36,7 @@
 #define UNIFYCR_SOCK_TIMEOUT 5000
 
 extern int server_sockfd;
+extern int client_sockfd;
 extern struct pollfd poll_set[MAX_NUM_CLIENTS];
 
 int sock_init_server(int local_rank_idx);
