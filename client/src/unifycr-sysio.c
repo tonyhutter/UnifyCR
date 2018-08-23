@@ -1306,21 +1306,21 @@ int unifycr_fd_logreadlist(read_req_t *read_req, int count)
    *((int *)shm_recvbuf + 1) = 0;
 */
 
-	flatcc_builder_t builder;
-    flatcc_builder_init(&builder);
+	if (read_req_set.count > 1) {
+		flatcc_builder_t builder;
+    	flatcc_builder_init(&builder);
 
-	unifycr_Extent_vec_start(&builder);
-	unifycr_Extent_vec_extend(&builder, read_req_set.count);
-    void *buffer;
-	unifycr_Extent_ref_t* v = unifycr_Extent_vec_edit(&builder);
-	//unifycr_Extent_t ext;
-	for (i = 0; i < read_req_set.count; i++) {
-		printf("adding extent %d in log read\n", i);
-		unifycr_Extent_ref_t ext = unifycr_Extent_create(&builder,
-                                                         read_req_set.read_reqs[i].fid,
-                                                         read_req_set.read_reqs[i].offset,
-                                                         read_req_set.read_reqs[i].length);
-		v[i] = ext;
+		unifycr_Extent_vec_start(&builder);
+		unifycr_Extent_vec_extend(&builder, read_req_set.count);
+    	void *buffer;
+		unifycr_Extent_ref_t* v = unifycr_Extent_vec_edit(&builder);
+		for (i = 0; i < read_req_set.count; i++) {
+			printf("adding extent %d in log read\n", i);
+			unifycr_Extent_ref_t ext = unifycr_Extent_create(&builder,
+                                                         	read_req_set.read_reqs[i].fid,
+                                                         	read_req_set.read_reqs[i].offset,
+                                                         	read_req_set.read_reqs[i].length);
+				v[i] = ext;
 
 
 /*
@@ -1334,24 +1334,30 @@ int unifycr_fd_logreadlist(read_req_t *read_req, int count)
         memcpy(shm_reqbuf + i * sizeof(shm_meta_t), \
                 tmp_sh_meta, sizeof(shm_meta_t));
 */
-    }
-	unifycr_Extent_vec_ref_t extents = unifycr_Extent_vec_end(&builder); 
-	unifycr_ReadRequest_create_as_root(&builder, extents);
-	//unifycr_ReadRequest_end_as_root(&builder);
-    size_t size;
-    buffer = flatcc_builder_finalize_buffer(&builder, &size);
-    assert(buffer);
-	printf("size is %ld\n", size);
+    	}
+		unifycr_Extent_vec_ref_t extents = unifycr_Extent_vec_end(&builder); 
+		unifycr_ReadRequest_create_as_root(&builder, extents);
+		//unifycr_ReadRequest_end_as_root(&builder);
+    	size_t size;
+    	buffer = flatcc_builder_finalize_buffer(&builder, &size);
+    	assert(buffer);
+		printf("size is %ld\n", size);
+	
+    	flatcc_builder_clear(&builder);
 
-    flatcc_builder_clear(&builder);
 
-
-    /* invoke read rpc here */
-    unifycr_client_read_rpc_invoke(&unifycr_rpc_context, app_id, local_rank_idx,
-                                   ptr_meta_entry->gfid, read_req_set.count, size,
-                                   buffer);
-	printf("completed read_rpc_invoke\n");
-	free(buffer);
+    	/* invoke read rpc here */
+    	unifycr_client_mread_rpc_invoke(&unifycr_rpc_context, app_id, local_rank_idx,
+                                   	ptr_meta_entry->gfid, read_req_set.count, size,
+                                   	buffer);
+		printf("completed mread_rpc_invoke\n");
+		free(buffer);
+	} else {
+    	unifycr_client_read_rpc_invoke(&unifycr_rpc_context, app_id, local_rank_idx,
+                                   	ptr_meta_entry->gfid, read_req_set.read_reqs[0].offset,
+                                    read_req_set.read_reqs[0].length);
+	}
+	
 
 	  /*
      * ToDo: Exception handling when some of the requests
@@ -1388,8 +1394,7 @@ int unifycr_fd_logreadlist(read_req_t *read_req, int count)
                         tmp_read_req.length = tmp_req->length;
                         tmp_read_req.buf = shm_recvbuf  + 2 * sizeof(int)+ sh_cursor;
 
-                        rc = unifycr_match_received_ack(read_req,\
-                                   count, &tmp_read_req);
+                        rc = unifycr_match_received_ack(read_req, count, &tmp_read_req);
                         if (rc == 0) {
                             sh_cursor += tmp_req->length;
                             tot_sz -= tmp_req->length;
@@ -1404,7 +1409,7 @@ int unifycr_fd_logreadlist(read_req_t *read_req, int count)
             }
         } else {
             printf("poll returned %d; error: %s\n", rc,  strerror(errno));
-				}
+		}
     }
     return rc;
 }
