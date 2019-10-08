@@ -45,4 +45,6 @@ int open_test(char* unifyfs_root);
 /* Tests for UNIFYFS_WRAP(open64) */
 int open64_test(char* unifyfs_root);
 
+int celso_test(char* unifyfs_root);
+
 #endif /* SYSIO_SUITE_H */
