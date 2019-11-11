@@ -986,7 +986,6 @@ ssize_t UNIFYFS_WRAP(read)(int fd, void* buf, size_t count)
             return 0;   /* EOF */
         }
 #endif
-
         return unifyfs_fd_read(fd, filedesc->pos, buf, count);
     } else {
         MAP_OR_FAIL(read);
@@ -998,12 +997,13 @@ ssize_t UNIFYFS_WRAP(read)(int fd, void* buf, size_t count)
 /* TODO: find right place to msync spillover mapping */
 ssize_t UNIFYFS_WRAP(write)(int fd, const void* buf, size_t count)
 {
-    LOGDBG("write was called for fd %d", fd);
     size_t ret;
     off_t pos;
 
     /* check whether we should intercept this file descriptor */
     if (unifyfs_intercept_fd(&fd)) {
+
+        LOGDBG("write %d bytes to fd %d", count, fd);
         /* get pointer to file descriptor structure */
         unifyfs_fd_t* filedesc = unifyfs_get_filedesc_from_fd(fd);
         if (filedesc == NULL) {
@@ -1708,9 +1708,6 @@ static int process_read_data(read_req_t* read_reqs, int count, int* done)
         req.length  = msg->length;
         req.errcode = msg->errcode;
 
-        LOGDBG("read reply: gfid=%d offset=%zu size=%zu",
-               req.gfid, req.offset, req.length);
-
         /* get pointer to data */
         req.buf = shmptr;
         shmptr += msg->length;
@@ -1836,7 +1833,6 @@ int unifyfs_fd_logreadlist(read_req_t* read_reqs, int count)
      * ToDo: Exception handling when some of the requests
      * are missed
      * */
-
     int done = 0;
     while (!done) {
         int tmp_rc = delegator_wait();
@@ -2009,6 +2005,12 @@ int UNIFYFS_WRAP(fsync)(int fd)
 {
     /* check whether we should intercept this file descriptor */
     if (unifyfs_intercept_fd(&fd)) {
+
+        if (*unifyfs_indices.ptr_num_entries == 0) {
+            /* Nothing to sync */
+            return 0;
+        }
+
         /* get the file id for this file descriptor */
         int fid = unifyfs_get_fid_from_fd(fd);
         if (fid < 0) {
@@ -2031,6 +2033,10 @@ int UNIFYFS_WRAP(fsync)(int fd)
                  * have already set errno to something reasonable */
                 return -1;
             }
+        }
+
+        if (unifyfs_flatten_writes) {
+            unifyfs_rewrite_index_from_seg_tree();
         }
 
         /* invoke fsync rpc to register index metadata with server */

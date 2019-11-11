@@ -34,7 +34,10 @@ BASE_SRCS = \
   unifyfs_runstate.h \
   unifyfs_runstate.c \
   unifyfs_shm.h \
-  unifyfs_shm.c
+  unifyfs_shm.c \
+  rb.c \
+  rb.h \
+  seg_tree.c
 
 OPT_FLAGS =
 OPT_LIBS =
