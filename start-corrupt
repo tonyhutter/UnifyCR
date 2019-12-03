@@ -1,0 +1,1 @@
+LD_PRELOAD=`pwd`/client/src/.libs/libunifyfs_gotcha.so:`pwd`/install/lib64/libgotcha.so ./examples/src/corrupt-static

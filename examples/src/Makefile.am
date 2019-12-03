@@ -23,7 +23,8 @@ if HAVE_LD_WRAP
   app-tileio-static \
   transfer-static \
   size-static \
-  chmod-static
+  chmod-static \
+  corrupt-static
 endif
 
 if HAVE_GOTCHA
@@ -44,7 +45,8 @@ if HAVE_GOTCHA
     app-tileio-gotcha \
     transfer-gotcha \
     size-gotcha \
-    chmod-gotcha
+    chmod-gotcha \
+	corrupt-gotcha
 endif
 
 if HAVE_FORTRAN
@@ -309,4 +311,14 @@ chmod_static_SOURCES  = chmod.c testutil.c
 chmod_static_CPPFLAGS = $(test_cppflags)
 chmod_static_LDADD    = $(test_static_ldadd)
 chmod_static_LDFLAGS  = $(test_static_ldflags)
+
+corrupt_gotcha_SOURCES  = corrupt.c testutil.c
+corrupt_gotcha_CPPFLAGS = $(test_cppflags)
+corrupt_gotcha_LDADD    = $(test_gotcha_ldadd)
+corrupt_gotcha_LDFLAGS  = $(test_gotcha_ldflags)
+
+corrupt_static_SOURCES  = corrupt.c testutil.c
+corrupt_static_CPPFLAGS = $(test_cppflags)
+corrupt_static_LDADD    = $(test_static_ldadd)
+corrupt_static_LDFLAGS  = $(test_static_ldflags)
 
