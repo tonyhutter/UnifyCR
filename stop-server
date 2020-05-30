@@ -1,0 +1,13 @@
+export UNIFYFS_DAEMONIZE=off
+export UNIFYFS_SPILLOVER_ENABLED=yes
+export UNIFYFS_DEBUG=on
+export UNIFYFS_LOG_VERBOSITY=5
+export UNIFYFS_SPILLOVER_SIZE=1073741825
+export UNIFYFS_SPILLOVER_META_DIR=~/meta
+export UNIFYFS_SPILLOVER_DATA_DIR=~/data
+
+# start the server
+`pwd`/util/unifyfs/src/unifyfs terminate
+
+sleep 1
+cat /tmp/unifyfsd.log*
