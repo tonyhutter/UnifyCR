@@ -2503,6 +2503,12 @@ int unifyfs_mount(const char prefix[], int rank, size_t size,
 {
     int rc;
     int kv_rank, kv_nranks;
+    static int mounted = 0;
+
+    if (mounted) {
+        LOGDBG("already mounted");
+        return UNIFYFS_SUCCESS;
+    }
 
     if (-1 != unifyfs_mounted) {
         if (l_app_id != unifyfs_mounted) {
@@ -2620,6 +2626,7 @@ int unifyfs_mount(const char prefix[], int rank, size_t size,
     /* record client state as mounted for specific app_id */
     unifyfs_mounted = unifyfs_app_id;
 
+    mounted = 1;
     return UNIFYFS_SUCCESS;
 }
 
