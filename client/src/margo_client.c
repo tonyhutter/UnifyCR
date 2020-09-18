@@ -182,10 +182,12 @@ int invoke_client_attach_rpc(void)
     if (NULL == client_rpc_context) {
         return UNIFYFS_FAILURE;
     }
-
+    LOGDBG("begin");
+ 
     /* get handle to rpc function */
     hg_handle_t handle = create_handle(client_rpc_context->rpcs.attach_id);
-
+    LOGDBG("got handle, filling info");
+ 
     /* fill in input struct */
     unifyfs_attach_in_t in;
     fill_client_attach_info(&in);
@@ -371,6 +373,8 @@ int invoke_client_metaget_rpc(int gfid, unifyfs_file_attr_t* file_meta)
 
     /* decode response */
     unifyfs_metaget_out_t out;
+    LOGDBG("metaget getting output");
+
     hret = margo_get_output(handle, &out);
     assert(hret == HG_SUCCESS);
     int32_t ret = out.ret;

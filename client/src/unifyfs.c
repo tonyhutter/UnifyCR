@@ -136,8 +136,8 @@ void* unifyfs_stream_stack;
 void* unifyfs_dirstream_stack;
 
 /* mount point information */
-char*  unifyfs_mount_prefix;
-size_t unifyfs_mount_prefixlen = 0;
+char*  unifyfs_mount_prefix = "/unifyfs";
+size_t unifyfs_mount_prefixlen = 9;
 
 /* to track current working directory */
 char* unifyfs_cwd;
@@ -287,14 +287,21 @@ static void unifyfs_normalize_path(const char* path, char* normalized)
 /* sets flag if the path is a special path */
 inline int unifyfs_intercept_path(const char* path, char* upath)
 {
-    /* don't intecept anything until we're initialized */
-    if (!unifyfs_initialized) {
-        return 0;
-    }
-
     /* if we have a relative path, prepend the current working directory */
     char target[UNIFYFS_MAX_FILENAME];
     unifyfs_normalize_path(path, target);
+
+#if 0
+    /* don't intecept anything until we're initialized */
+    if (!unifyfs_initialized && strncmp(target, unifyfs_mount_prefix, unifyfs_mount_prefixlen) == 0) {
+        unifyfs_initialized = 2;
+        
+        LOGDBG("we're not initialized for %s %s, initializing\n", path, upath);
+        unifyfs_mount("/unifyfs", 1, 1, 42);
+        return 0;
+    }
+#endif
+
 
     /* if the path starts with our mount point, intercept it */
     int intercept = 0;
@@ -324,10 +331,15 @@ inline int unifyfs_intercept_fd(int* fd)
 {
     int oldfd = *fd;
 
+#if 0
     /* don't intecept anything until we're initialized */
-    if (!unifyfs_initialized) {
+    if (!unifyfs_initialized && unifyfs_initialized != 2 && oldfd >= unifyfs_fd_limit) {
+        LOGDBG("we're not initialized for fd %d, initializing\n", oldfd);
+        unifyfs_mount("/unifyfs", 1, 1, 42);
+ 
         return 0;
     }
+#endif
 
     if (oldfd < unifyfs_fd_limit) {
         /* this fd is a real system fd, so leave it as is */
@@ -2365,6 +2377,7 @@ static int unifyfs_init(void)
 
         /* get a superblock of shared memory and initialize our
          * global variables for this block */
+        LOGDBG("init superblock");
         rc = init_superblock_shm(shm_super_size);
         if (rc != UNIFYFS_SUCCESS) {
             LOGERR("failed to initialize superblock shmem");
@@ -2378,6 +2391,7 @@ static int unifyfs_init(void)
             return UNIFYFS_FAILURE;
         }
 
+        LOGDBG("init client");
         /* initialize log-based I/O context */
         rc = unifyfs_logio_init_client(unifyfs_app_id, unifyfs_client_id,
                                        &client_cfg, &logio_ctx);
@@ -2463,10 +2477,16 @@ void fill_client_mount_info(unifyfs_mount_in_t* in)
 /* Fill attach rpc input struct with client-side context info */
 void fill_client_attach_info(unifyfs_attach_in_t* in)
 {
+    LOGDBG("beginn")
+    LOGDBG("num entries %p", unifyfs_indices.ptr_num_entries)
+    LOGDBG("shm_super_ctx %p", shm_super_ctx);
+
     size_t meta_offset = (char*)unifyfs_indices.ptr_num_entries -
                          (char*)shm_super_ctx->addr;
+    LOGDBG("set meta_offset")
     size_t meta_size   = unifyfs_max_index_entries
                          * sizeof(unifyfs_index_t);
+    LOGDBG("begin2");
 
     in->app_id            = unifyfs_app_id;
     in->client_id         = unifyfs_client_id;
@@ -2474,19 +2494,27 @@ void fill_client_attach_info(unifyfs_attach_in_t* in)
     in->shmem_super_size  = shm_super_ctx->size;
     in->meta_offset       = meta_offset;
     in->meta_size         = meta_size;
+    LOGDBG("middle");
+
+    LOGDBG("in %p", in);
+    LOGDBG("logio_ctx %p",logio_ctx);
+
 
     if (NULL != logio_ctx->shmem) {
         in->logio_mem_size = logio_ctx->shmem->size;
     } else {
         in->logio_mem_size = 0;
     }
-
-    in->logio_spill_size = logio_ctx->spill_sz;
+    LOGDBG("middle2");
+        in->logio_spill_size = logio_ctx->spill_sz;
     if (logio_ctx->spill_sz) {
         in->logio_spill_dir = strdup(client_cfg.logio_spill_dir);
     } else {
         in->logio_spill_dir = NULL;
     }
+    LOGDBG("end");
+
+
 }
 
 /**
@@ -2594,7 +2622,7 @@ int unifyfs_mount(const char prefix[], int rank, size_t size,
 
     /* Call client attach rpc function to register our newly created shared
      * memory and files with server */
-    LOGDBG("calling attach rpc");
+    LOGDBG("calling attachh rpc");
     rc = invoke_client_attach_rpc();
     if (rc != UNIFYFS_SUCCESS) {
         /* If we fail, bail with an error */
@@ -2608,12 +2636,18 @@ int unifyfs_mount(const char prefix[], int rank, size_t size,
      * file. The memory region will stay active until both client and server
      * unmap them. We keep the superblock file around so that a future client
      * can reattach to it. */
+    LOGDBG("calling shm unlink");
     unifyfs_shm_unlink(shm_recv_ctx);
 
+    LOGDBG("creating mount point");
     /* add mount point as a new directory in the file list */
     if (unifyfs_get_fid_from_path(prefix) < 0) {
         /* no entry exists for mount point, so create one */
+        LOGDBG("creating prefix %s", prefix);
+
         int fid = unifyfs_fid_create_directory(prefix);
+        LOGDBG("created prefix %s", prefix);
+
         if (fid < 0) {
             /* if there was an error, return it */
             LOGERR("failed to create directory entry for mount point: `%s'",

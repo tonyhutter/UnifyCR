@@ -63,20 +63,45 @@ static const char packed_scripts[] ALIGN1 = { PACKED_SCRIPTS };
 
 #include <unifyfs.h>
 
+int unifyfs_is_running = 0;
+
 void unifyfs_start(void)
 {
-    int mysize, myrank;
-       full_write2_str("LOADING UNIFY\n");
-
-    unifyfs_mount("/unifyfs", 0, 1, 42);
+    char pidstr[50] = {0};
+    sprintf(pidstr, "unifyfs_start pid %d", getpid());
+    full_write2_str(pidstr);
+   
+    if (unifyfs_is_running) {
+        full_write2_str(" ...already running\n");
+    } else {
+        full_write2_str(" ...calling unifyfs_mount()\n");
+        unifyfs_mount("/unifyfs", 0, 1, getpid());
+        unifyfs_is_running = 1;
+    }
 }
 
 void unifyfs_end(void)
 {
-       full_write2_str("UNLOADING UNIFY\n");
-
-    unifyfs_unmount();
+    char pidstr[50] = {0};
+    sprintf(pidstr, "fake unifyfs_end pid %d ", getpid());
+    full_write2_str(pidstr);
+    return;
+ 
+    if (unifyfs_is_running) {
+        full_write2_str(" ...calling unifyfs_unmount()\n");
+       
+        unifyfs_unmount();
+        unifyfs_is_running = 0;
+    } else {
+        full_write2_str(" ...not running, nothing to do\n");
+    }
 }
+
+int unifyfs_running(void)
+{
+    return unifyfs_is_running;
+}
+
 
 /* "Do not compress usage text if uncompressed text is small
  *  and we don't include bunzip2 code for other reasons"
@@ -972,7 +997,13 @@ int busybox_main(int argc UNUSED_PARAM, char **argv)
 	/* We support "busybox /a/path/to/applet args..." too. Allows for
 	 * "#!/bin/busybox"-style wrappers */
 	applet_name = bb_get_last_path_component_nostrip(argv[0]);
+    unifyfs_start();
+    full_write2_str("calling run_applet_and_exit without (but turned it on) unifyfs init on ");
+    full_write2_str(applet_name);
+    full_write2_str("\n");
+
 	run_applet_and_exit(applet_name, argv);
+    unifyfs_end();
 }
 # endif
 
@@ -980,6 +1011,9 @@ int busybox_main(int argc UNUSED_PARAM, char **argv)
 void FAST_FUNC run_applet_no_and_exit(int applet_no, const char *name, char **argv)
 {
 	int argc = string_array_len(argv);
+    full_write2_str("begin run_applet_no_and_exit ");
+    full_write2_str(name);
+    full_write2_str("\n");
 
 	/*
 	 * We do not use argv[0]: do not want to repeat massaging of
@@ -1011,8 +1045,11 @@ void FAST_FUNC run_applet_no_and_exit(int applet_no, const char *name, char **ar
 	}
 	if (ENABLE_FEATURE_SUID)
 		check_suid(applet_no);
+    printf("%s: calling applet_main (at unifyfs_start again) %s\n", __func__, *argv);
+    unifyfs_start(); 
 	xfunc_error_retval = applet_main[applet_no](argc, argv);
 	/* Note: applet_main() may also not return (die on a xfunc or such) */
+    unifyfs_end();
 	xfunc_die();
 }
 # endif /* NUM_APPLETS > 0 */
@@ -1020,6 +1057,10 @@ void FAST_FUNC run_applet_no_and_exit(int applet_no, const char *name, char **ar
 # if ENABLE_BUSYBOX || NUM_APPLETS > 0
 static NORETURN void run_applet_and_exit(const char *name, char **argv)
 {
+    full_write2_str("begin run_applet_and_exit ");
+    full_write2_str(name);
+    full_write2_str("\n");
+
 #  if ENABLE_BUSYBOX
 	if (is_prefixed_with(name, "busybox"))
 		exit(busybox_main(/*unused:*/ 0, argv));
@@ -1028,8 +1069,9 @@ static NORETURN void run_applet_and_exit(const char *name, char **argv)
 	/* find_applet_by_name() search is more expensive, so goes second */
 	{
 		int applet = find_applet_by_name(name);
-		if (applet >= 0)
+		if (applet >= 0) {
 			run_applet_no_and_exit(applet, name, argv);
+        }
 	}
 #  endif
 
@@ -1137,7 +1179,12 @@ int main(int argc UNUSED_PARAM, char **argv)
 	}
 
 	parse_config_file(); /* ...maybe, if FEATURE_SUID_CONFIG */
+   full_write2_str("main running ");
+    full_write2_str(applet_name);
+    full_write2_str("\n");
+
     unifyfs_start();
+    full_write2_str("unifyfs is initted, running applet\n");
 	run_applet_and_exit(applet_name, argv);
     unifyfs_end();
 #endif

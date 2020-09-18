@@ -65,8 +65,13 @@ UNIFYFS_DECL(remove, int, (const char* path));
 UNIFYFS_DECL(rename, int, (const char* oldpath, const char* newpath));
 UNIFYFS_DECL(truncate, int, (const char* path, off_t length));
 UNIFYFS_DECL(stat, int, (const char* path, struct stat* buf));
+//UNIFYFS_DECL(stat64, int, (const char* path, struct stat* buf));
+UNIFYFS_DECL(lstat, int, (const char* path, struct stat* buf));
+//UNIFYFS_DECL(lstat64, int, (const char* path, struct stat* buf));
 UNIFYFS_DECL(__xstat, int, (int vers, const char* path, struct stat* buf));
+UNIFYFS_DECL(__xstat64, int, (int vers, const char* path, struct stat64* buf));
 UNIFYFS_DECL(__lxstat, int, (int vers, const char* path, struct stat* buf));
+UNIFYFS_DECL(__lxstat64, int, (int vers, const char* path, struct stat64* buf));
 UNIFYFS_DECL(statfs, int, (const char* path, struct statfs* fsbuf));
 
 
@@ -96,7 +101,9 @@ UNIFYFS_DECL(lseek64, off64_t, (int fd, off64_t offset, int whence));
 UNIFYFS_DECL(fchdir, int, (int fd));
 UNIFYFS_DECL(ftruncate, int, (int fd, off_t length));
 UNIFYFS_DECL(fstat, int, (int fd, struct stat* buf));
+//UNIFYFS_DECL(fstat64, int, (int fd, struct stat64* buf));
 UNIFYFS_DECL(__fxstat, int, (int vers, int fd, struct stat* buf));
+UNIFYFS_DECL(__fxstat64, int, (int vers, int fd, struct stat64* buf));
 UNIFYFS_DECL(fstatfs, int, (int fd, struct statfs* fsbuf));
 UNIFYFS_DECL(fsync, int, (int fd));
 UNIFYFS_DECL(fdatasync, int, (int fd));
@@ -107,7 +114,6 @@ UNIFYFS_DECL(mmap64, void*, (void* addr, size_t length, int prot, int flags,
                              int fd, off64_t offset));
 UNIFYFS_DECL(munmap, int, (void* addr, size_t length));
 UNIFYFS_DECL(msync, int, (void* addr, size_t length, int flags));
-UNIFYFS_DECL(__fxstat, int, (int vers, int fd, struct stat* buf));
 UNIFYFS_DECL(close, int, (int fd));
 UNIFYFS_DECL(lio_listio, int, (int mode, struct aiocb* const aiocb_list[],
                                int nitems, struct sigevent* sevp));

@@ -52,6 +52,8 @@ int UNIFYFS_WRAP(access)(const char* path, int mode)
 {
     /* determine whether we should intercept this path */
     char upath[UNIFYFS_MAX_FILENAME];
+    LOGDBG("accesss() was called for %s", path);
+
     if (unifyfs_intercept_path(path, upath)) {
         /* check if path exists */
         if (unifyfs_get_fid_from_path(upath) < 0) {
@@ -159,6 +161,9 @@ int UNIFYFS_WRAP(chdir)(const char* path)
 {
     /* determine whether we should intercept this path */
     char upath[UNIFYFS_MAX_FILENAME];
+    LOGDBG("chdir() was called for %s", path);
+
+
     if (unifyfs_intercept_path(path, upath)) {
         /* TODO: check that path is not a file? */
         /* we're happy to change into any directory in unifyfs */
@@ -727,6 +732,13 @@ static int __stat(const char* path, struct stat* buf)
     return 0;
 }
 
+/* The main stat call for all the *stat() functions */
+static int __stat64(const char* path, struct stat64* buf)
+{
+    return __stat(path, (struct stat *) buf);
+}
+ 
+
 int UNIFYFS_WRAP(stat)(const char* path, struct stat* buf)
 {
     LOGDBG("stat was called for %s", path);
@@ -740,6 +752,60 @@ int UNIFYFS_WRAP(stat)(const char* path, struct stat* buf)
         return ret;
     }
 }
+
+#if 0
+int UNIFYFS_WRAP(stat64)(const char* path, struct stat64* buf)
+{
+    LOGDBG("stat64 was called for %s", path);
+    char upath[UNIFYFS_MAX_FILENAME];
+    if (unifyfs_intercept_path(path, upath)) {
+        int ret = __stat64(upath, buf);
+        return ret;
+    } else {
+        MAP_OR_FAIL(stat64);
+        int ret = UNIFYFS_REAL(stat64)(path, buf);
+        return ret;
+    }
+}
+#endif
+
+/* 
+ * lstat() - same as stat(), but if path is a symlink, then stat the symlink,
+ * not the file it points to.
+ */
+int UNIFYFS_WRAP(lstat)(const char* path, struct stat* buf)
+{
+    LOGDBG("lstat was called for %s", path);
+    char upath[UNIFYFS_MAX_FILENAME];
+    if (unifyfs_intercept_path(path, upath)) {
+        int ret = __stat(upath, buf);
+        return ret;
+    } else {
+        MAP_OR_FAIL(lstat);
+        int ret = UNIFYFS_REAL(lstat)(path, buf);
+        return ret;
+    }
+}
+
+#if 0
+/* 
+ * lstat64() - same as stat(), but if path is a symlink, then stat the symlink,
+ * not the file it points to.
+ */
+int UNIFYFS_WRAP(lstat64)(const char* path, struct stat64* buf)
+{
+    LOGDBG("lstat64 was called for %s", path);
+    char upath[UNIFYFS_MAX_FILENAME];
+    if (unifyfs_intercept_path(path, upath)) {
+        int ret = __stat64(upath, buf);
+        return ret;
+    } else {
+        MAP_OR_FAIL(lstat64);
+        int ret = UNIFYFS_REAL(lstat64)(path, buf);
+        return ret;
+    }
+}
+#endif
 
 int UNIFYFS_WRAP(fstat)(int fd, struct stat* buf)
 {
@@ -757,6 +823,25 @@ int UNIFYFS_WRAP(fstat)(int fd, struct stat* buf)
         return ret;
     }
 }
+
+#if 0
+int UNIFYFS_WRAP(fstat64)(int fd, struct stat64* buf)
+{
+    LOGDBG("fstat64 was called for fd: %d", fd);
+
+    /* check whether we should intercept this file descriptor */
+    if (unifyfs_intercept_fd(&fd)) {
+        int fid = unifyfs_get_fid_from_fd(fd);
+        const char* path = unifyfs_path_from_fid(fid);
+        int ret = __stat64(path, buf);
+        return ret;
+    } else {
+        MAP_OR_FAIL(fstat64);
+        int ret = UNIFYFS_REAL(fstat64)(fd, buf);
+        return ret;
+    }
+}
+#endif
 
 /*
  * NOTE on __xstat(2), __lxstat(2), and __fxstat(2)
@@ -786,6 +871,26 @@ int UNIFYFS_WRAP(__xstat)(int vers, const char* path, struct stat* buf)
         return ret;
     }
 }
+
+int UNIFYFS_WRAP(__xstat64)(int vers, const char* path, struct stat64* buf)
+{
+    LOGDBG("__xstat64 was called for %s", path);
+
+    char upath[UNIFYFS_MAX_FILENAME];
+    if (unifyfs_intercept_path(path, upath)) {
+        if (vers != _STAT_VER) {
+            errno = EINVAL;
+            return -1;
+        }
+        int ret = __stat64(upath, buf);
+        return ret;
+    } else {
+        MAP_OR_FAIL(__xstat64);
+        int ret = UNIFYFS_REAL(__xstat64)(vers, path, buf);
+        return ret;
+    }
+}
+
 #endif
 
 #ifdef HAVE___LXSTAT
@@ -807,12 +912,32 @@ int UNIFYFS_WRAP(__lxstat)(int vers, const char* path, struct stat* buf)
         return ret;
     }
 }
+
+int UNIFYFS_WRAP(__lxstat64)(int vers, const char* path, struct stat64* buf)
+{
+    LOGDBG("__lxstat64 was called for %s", path);
+
+    char upath[UNIFYFS_MAX_FILENAME];
+    if (unifyfs_intercept_path(path, upath)) {
+        if (vers != _STAT_VER) {
+            errno = EINVAL;
+            return -1;
+        }
+        int ret = __stat64(upath, buf);
+        return ret;
+    } else {
+        MAP_OR_FAIL(__lxstat64);
+        int ret = UNIFYFS_REAL(__lxstat64)(vers, path, buf);
+        return ret;
+    }
+}
+
 #endif
 
 #ifdef HAVE___FXSTAT
 int UNIFYFS_WRAP(__fxstat)(int vers, int fd, struct stat* buf)
 {
-    LOGDBG("fxstat was called for fd %d", fd);
+    LOGDBG("__fxstat64 was called for fd %d", fd);
 
     /* check whether we should intercept this file descriptor */
     if (unifyfs_intercept_fd(&fd)) {
@@ -831,6 +956,29 @@ int UNIFYFS_WRAP(__fxstat)(int vers, int fd, struct stat* buf)
         return ret;
     }
 }
+
+int UNIFYFS_WRAP(__fxstat64)(int vers, int fd, struct stat64* buf)
+{
+    LOGDBG("__fxstat64 was called for fd %d", fd);
+
+    /* check whether we should intercept this file descriptor */
+    if (unifyfs_intercept_fd(&fd)) {
+        if (vers != _STAT_VER) {
+            errno = EINVAL;
+            return -1;
+        }
+
+        int fid = unifyfs_get_fid_from_fd(fd);
+        const char* path = unifyfs_path_from_fid(fid);
+        int ret = __stat64(path, buf);
+        return ret;
+    } else {
+        MAP_OR_FAIL(__fxstat64);
+        int ret = UNIFYFS_REAL(__fxstat64)(vers, fd, buf);
+        return ret;
+    }
+}
+
 #endif
 
 
@@ -1022,6 +1170,7 @@ int unifyfs_fd_write(int fd, off_t pos, const void* buf, size_t count,
 int UNIFYFS_WRAP(creat)(const char* path, mode_t mode)
 {
     /* equivalent to open(path, O_WRONLY|O_CREAT|O_TRUNC, mode) */
+    LOGDBG("creat() was called for %s", path);
 
     /* check whether we should intercept this path */
     char upath[UNIFYFS_MAX_FILENAME];
@@ -1067,6 +1216,9 @@ int UNIFYFS_WRAP(creat64)(const char* path, mode_t mode)
 {
     /* check whether we should intercept this path */
     char upath[UNIFYFS_MAX_FILENAME];
+    LOGDBG("creat64() was called for %s", path);
+
+
     if (unifyfs_intercept_path(path, upath)) {
         /* ERROR: fn not yet supported */
         fprintf(stderr, "Function not yet supported @ %s:%d\n",
@@ -1084,6 +1236,8 @@ int UNIFYFS_WRAP(open)(const char* path, int flags, ...)
 {
     /* if O_CREAT is set, we should also have some mode flags */
     int mode = 0;
+
+
     if (flags & O_CREAT) {
         va_list arg;
         va_start(arg, flags);
@@ -1094,6 +1248,8 @@ int UNIFYFS_WRAP(open)(const char* path, int flags, ...)
     /* determine whether we should intercept this path */
     int ret;
     char upath[UNIFYFS_MAX_FILENAME];
+
+    LOGDBG("begin open() %s\n", path);
     if (unifyfs_intercept_path(path, upath)) {
         /* TODO: handle relative paths using current working directory */
 
@@ -1144,6 +1300,8 @@ int UNIFYFS_WRAP(open64)(const char* path, int flags, ...)
 {
     /* if O_CREAT is set, we should also have some mode flags */
     int mode = 0;
+
+    LOGDBG("open64() was called for %s", path);
     if (flags & O_CREAT) {
         va_list arg;
         va_start(arg, flags);
@@ -1334,6 +1492,8 @@ off64_t UNIFYFS_WRAP(lseek64)(int fd, off64_t offset, int whence)
 #ifdef HAVE_POSIX_FADVISE
 int UNIFYFS_WRAP(posix_fadvise)(int fd, off_t offset, off_t len, int advice)
 {
+    LOGDBG("posix_fadvise() was called for %d", fd);
+
     /* check whether we should intercept this file descriptor */
     if (unifyfs_intercept_fd(&fd)) {
         /* check that the file descriptor is valid */

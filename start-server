@@ -6,6 +6,7 @@ export UNIFYFS_LOG_VERBOSITY=5
 export UNIFYFS_SPILLOVER_SIZE=1073741825
 export UNIFYFS_SPILLOVER_META_DIR=~/meta
 export UNIFYFS_SPILLOVER_DATA_DIR=~/data
+export UNIFYFS_LOGIO_SPILL_DIR=~/spillover
 
 # start the server
 `pwd`/util/unifyfs/src/unifyfs start -S ~/shared -m /unifyfs -e  `pwd`/server/src/unifyfsd 

@@ -232,8 +232,11 @@ CP_WRAPPERS+=",-wrap,remove"
 CP_WRAPPERS+=",-wrap,rename"
 CP_WRAPPERS+=",-wrap,truncate"
 CP_WRAPPERS+=",-wrap,stat"
+//CP_WRAPPERS+=",-wrap,stat64"
+CP_WRAPPERS+=",-wrap,lstat"
+//CP_WRAPPERS+=",-wrap,lstat64"
 CP_WRAPPERS+=",-wrap,fstat"
-
+//CP_WRAPPERS+=",-wrap,fstat64"
 
 AC_CHECK_FUNCS(statfs,[
     CP_WRAPPERS+=",-wrap,statfs"
@@ -244,12 +247,15 @@ AC_CHECK_FUNCS(fstatfs,[
 
 AC_CHECK_FUNCS(__lxstat,[
     CP_WRAPPERS+=",-wrap,__lxstat"
+    CP_WRAPPERS+=",-wrap,__lxstat64"
 ],[])
 AC_CHECK_FUNCS(__xstat,[
-    CP_WRAPPERS+=",-wrap,__xstat"
+   CP_WRAPPERS+=",-wrap,__xstat"
+   CP_WRAPPERS+=",-wrap,__xstat64"
 ],[])
 AC_CHECK_FUNCS(__fxstat,[
     CP_WRAPPERS+=",-wrap,__fxstat"
+    CP_WRAPPERS+=",-wrap,__fxstat64"
 ],[])
 
 CP_WRAPPERS+=",-wrap,creat"
