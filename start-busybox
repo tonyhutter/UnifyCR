@@ -1,1 +1,6 @@
+#!/bin/bash
+if ! ps aux | grep -q unifyfsd ; then
+    echo "unifyfsd is not running, try ./start-server"
+    exit
+fi
 UNIFYFS_LOGIO_SPILL_DIR=$(mktemp --suffix=unifyfs-busybox -d) PATH= ./deps/busybox/busybox ash

@@ -1,0 +1,15 @@
+--- busybox support is under development! --- 
+
+busybox is a stripped down collection of utilities, including a shell (ash), 
+than are compiled as one binary.  We are trying to get it built against
+UnifyFS so you can 'shell' into /unifyfs, just like you would any other dir.
+
+Quickstart:
+
+1. ./bootstrap.sh and then follow the instructions to make UnifyFS
+2. 'make install' UnifyFS.  This puts the UnifyFS librariesin `pwd`/install
+3. ./busybox-bootstrap.sh
+4. ./start-server to startup the UnifyFS server.  Make sure the paths are
+   correct in that script before running.
+5. ./start-busybox will start up busybox's ash shell.
+
